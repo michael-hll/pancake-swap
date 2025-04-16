@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@types/js-yaml": "^4.0.9",
+    "hardhat": "^2.23.0",
+    "js-yaml": "^4.1.0"
+  }
+}

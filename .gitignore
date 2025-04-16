@@ -1,0 +1,32 @@
+# Hardhat Ignition default folder for deployments against a local node
+ignition/deployments/chain-31337
+
+# Development
+node_modules
+.env
+coverage
+coverage.json
+typechain
+typechain-types
+
+# Production
+dist
+build
+
+# Hardhat
+cache
+artifacts
+
+# IDEs and editors
+.vscode
+
+# OS specific
+.DS_Store
+
+# Don't commit flattened files
+*Flat.sol
+
+# Don't commit private keys or mnemonic files
+private-key.yaml
+
+data
