@@ -16,18 +16,18 @@ contract FlashSwap {
     using SafeERC20 for IERC20;
     address private owner;
 
-    constructor() public {
+    address private PANCAKE_FACTORY;
+    address private PANCAKE_ROUTER;
+    address private WBNB;
+
+    constructor(address _factory, address _router, address _wbnb) public {
         owner = msg.sender;
+        PANCAKE_FACTORY = _factory;
+        PANCAKE_ROUTER = _router;
+        WBNB = _wbnb;
     }
 
-    // Factory and Routing Addresses
-    address private constant PANCAKE_FACTORY =
-        0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
-    address private constant PANCAKE_ROUTER =
-        0x10ED43C718714eb63d5aA57B78B54704E256024E;
-
     // Token Addresses
-    address private constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c; // WBNB
     address private TOKEN0 = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56; // BUSD
     address private TOKEN1 = 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82; // CAKE
     address private TOKEN2 = 0x2c094F5A7D1146BB93850f629501eB749f6Ed491; // CROX
@@ -131,26 +131,37 @@ contract FlashSwap {
         return _output > (_input * 1005) / 1000; // 0.5% profit;
     }
 
+    function safeApprove(
+        address token,
+        address spender,
+        uint256 amount
+    ) internal {
+        uint256 currentAllowance = IERC20(token).allowance(
+            address(this),
+            spender
+        );
+        if (currentAllowance < amount) {
+            IERC20(token).safeApprove(spender, 0);
+            IERC20(token).safeApprove(spender, amount);
+        }
+    }
+
     function start(
-        address _token01,
+        address _token0,
         uint256 _borrow_amt,
-        address _token02,
-        address _token03
+        address _token1,
+        address _token2
     ) external {
         require(msg.sender == owner, "Only owner can initiate arbitrage");
-        TOKEN0 = _token01;
-        TOKEN1 = _token02;
-        TOKEN2 = _token03;
-        IERC20(TOKEN0).safeApprove(address(PANCAKE_ROUTER), 0);
-        IERC20(TOKEN0).safeApprove(address(PANCAKE_ROUTER), _borrow_amt);
-        IERC20(TOKEN1).safeApprove(address(PANCAKE_ROUTER), MAX_INT);
-        IERC20(TOKEN2).safeApprove(address(PANCAKE_ROUTER), MAX_INT);
+        TOKEN0 = _token0;
+        TOKEN1 = _token1;
+        TOKEN2 = _token2;
+        safeApprove(TOKEN0, address(PANCAKE_ROUTER), MAX_INT);
+        safeApprove(TOKEN1, address(PANCAKE_ROUTER), MAX_INT);
+        safeApprove(TOKEN2, address(PANCAKE_ROUTER), MAX_INT);
 
         // Get the Factory Pair address for combined tokens
-        address pair = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
-            _token01,
-            WBNB
-        );
+        address pair = IUniswapV2Factory(PANCAKE_FACTORY).getPair(TOKEN0, WBNB);
 
         // Return error if combination does not exist
         require(
@@ -161,11 +172,11 @@ contract FlashSwap {
         // Figure out which token (0 or 1) has the amount and assign
         address token0 = IUniswapV2Pair(pair).token0();
         address token1 = IUniswapV2Pair(pair).token1();
-        uint256 amount0Out = _token01 == token0 ? _borrow_amt : 0;
-        uint256 amount1Out = _token01 == token1 ? _borrow_amt : 0;
+        uint256 amount0Out = TOKEN0 == token0 ? _borrow_amt : 0;
+        uint256 amount1Out = TOKEN0 == token1 ? _borrow_amt : 0;
 
         // Passing data as bytes so that the 'swap' function knows it is a flashloan
-        bytes memory data = abi.encode(_token01, _borrow_amt, msg.sender);
+        bytes memory data = abi.encode(TOKEN0, _borrow_amt, msg.sender);
 
         // Execute the initial swap to get the loan
         IUniswapV2Pair(pair).swap(amount0Out, amount1Out, address(this), data);
@@ -238,6 +249,6 @@ contract FlashSwap {
         }
 
         // Pay Loan Back
-        IERC20(tokenBorrow).transfer(pair, amountToRepay);
+        IERC20(tokenBorrow).safeTransfer(pair, amountToRepay);
     }
 }
