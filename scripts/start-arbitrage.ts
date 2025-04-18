@@ -164,7 +164,14 @@ async function executeArbitrage(
   console.log("Sending transaction...");
 
   // Call the start function
-  const tx = await flashSwap.start(token0, borrowAmount, token1, token2, 0);
+  const tx = await flashSwap.start(
+    token0,
+    borrowAmount,
+    token1,
+    token2,
+    0,
+    [997, 997, 997] // slippage for 3 trades
+  );
 
   console.log(`Transaction sent! Hash: ${tx.hash}`);
   console.log(

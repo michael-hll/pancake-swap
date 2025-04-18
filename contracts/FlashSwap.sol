@@ -20,6 +20,8 @@ contract FlashSwap is ReentrancyGuard {
     bool private debugMode;
     bool private locked;
     uint256 private deadlineMinutes = 5;
+    uint256 private defaultSlippage = 997; // 0.3% slippage
+    uint256[] private slippageValues;
 
     address private PANCAKE_FACTORY;
     address private PANCAKE_ROUTER;
@@ -61,27 +63,27 @@ contract FlashSwap is ReentrancyGuard {
     );
 
     function setTestMode(bool _testMode) external {
-        require(msg.sender == owner, "Only owner can set test mode");
+        require(msg.sender == owner, "!owner");
         testMode = _testMode;
     }
 
     function getTestMode() external view returns (bool) {
-        require(msg.sender == owner, "Only owner can get test mode");
+        require(msg.sender == owner, "!owner");
         return testMode;
     }
 
     function setDebugMode(bool _debugMode) external {
-        require(msg.sender == owner, "Only owner can set debug mode");
+        require(msg.sender == owner, "!owner");
         debugMode = _debugMode;
     }
 
     function getDebugMode() external view returns (bool) {
-        require(msg.sender == owner, "Only owner can get debug mode");
+        require(msg.sender == owner, "!owner");
         return debugMode;
     }
 
     function setDeadlineMinutes(uint256 _minutes) public {
-        require(msg.sender == owner, "Only owner can set deadline minutes");
+        require(msg.sender == owner, "!owner");
         require(
             _minutes > 0 && _minutes <= 60,
             "Minutes must be between 1 and 60"
@@ -90,23 +92,34 @@ contract FlashSwap is ReentrancyGuard {
     }
 
     function getDeadlineMinutes() external view returns (uint256) {
-        require(msg.sender == owner, "Only owner can get deadline minutes");
+        require(msg.sender == owner, "!owner");
         return deadlineMinutes;
     }
 
     function getFactory() external view returns (address) {
-        require(msg.sender == owner, "Only owner can get factory");
+        require(msg.sender == owner, "!owner");
         return PANCAKE_FACTORY;
     }
 
     function getRouter() external view returns (address) {
-        require(msg.sender == owner, "Only owner can get router");
+        require(msg.sender == owner, "!owner");
         return PANCAKE_ROUTER;
     }
 
     function getBaseToken() external view returns (address) {
-        require(msg.sender == owner, "Only owner can get base token");
+        require(msg.sender == owner, "!owner");
         return BASE_TOKEN;
+    }
+
+    function setDefaultSlippage(uint256 _slippage) external {
+        require(msg.sender == owner, "!owner");
+        require(_slippage >= 990 && _slippage <= 999, "Invalid value");
+        defaultSlippage = _slippage;
+    }
+
+    function getDefaultSlippage() external view returns (uint256) {
+        require(msg.sender == owner, "!owner");
+        return defaultSlippage;
     }
 
     // FUND SMART CONTRACT
@@ -126,62 +139,20 @@ contract FlashSwap is ReentrancyGuard {
     }
 
     function emergencyWithdraw(address _token) external {
-        require(msg.sender == owner, "Only owner can withdraw");
+        require(msg.sender == owner, "!owner");
         uint256 balance = IERC20(_token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(_token).safeTransfer(owner, balance);
         }
     }
 
-    // Add this function to receive Base Token
     receive() external payable {}
 
     // Add a function to withdraw Base Token
     function withdrawBaseToken() external {
-        require(msg.sender == owner, "Only owner can withdraw");
+        require(msg.sender == owner, "!owner");
         (bool success, ) = owner.call{value: address(this).balance}("");
-        require(success, "BaseToken transfer failed");
-    }
-
-    // PLACE A TRADE
-    // Executed placing a trade
-    function placeTrade(
-        address _fromToken,
-        address _toToken,
-        uint256 _amountIn
-    ) private returns (uint256) {
-        address pair = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
-            _fromToken,
-            _toToken
-        );
-        require(pair != address(0), "Pool does not exist");
-
-        // Calculate Amount Out
-        address[] memory path = new address[](2);
-        path[0] = _fromToken;
-        path[1] = _toToken;
-
-        uint256 expectedAmount = IUniswapV2Router01(PANCAKE_ROUTER)
-            .getAmountsOut(_amountIn, path)[1];
-
-        // Add slippage tolerance
-        uint256 amountOutMin = (expectedAmount * 997) / 1000; // 0.3% slippage max
-
-        uint256 currentDeadline = block.timestamp +
-            (deadlineMinutes * 1 minutes);
-        // Perform Arbitrage - Swap for another token
-        uint256 amountReceived = IUniswapV2Router01(PANCAKE_ROUTER)
-            .swapExactTokensForTokens(
-                _amountIn,
-                amountOutMin,
-                path,
-                address(this),
-                currentDeadline
-            )[1];
-
-        require(amountReceived > 0, "Aborted Tx: Trade returned zero");
-
-        return amountReceived;
+        require(success, "Transfer failed");
     }
 
     // CHECK PROFITABILITY
@@ -190,7 +161,7 @@ contract FlashSwap is ReentrancyGuard {
         uint256 _input,
         uint256 _output
     ) private pure returns (bool) {
-        return _output > (_input * 1005) / 1000; // 0.5% profit;
+        return _output > (_input * 1005) / 1000; // > 0.5% profit to make sure it covers the gas fee
     }
 
     function safeApprove(
@@ -215,55 +186,43 @@ contract FlashSwap is ReentrancyGuard {
         address _token2
     ) private view returns (address) {
         // Basic parameter validation
-        require(_token0 != address(0), "Token0 cannot be zero address");
-        require(_token1 != address(0), "Token1 cannot be zero address");
-        require(_token2 != address(0), "Token2 cannot be zero address");
-        require(_borrow_amt > 0, "Borrow amount must be greater than zero");
+        require(_token0 != address(0), "Token0 is 0");
+        require(_token1 != address(0), "Token1 is 0");
+        require(_token2 != address(0), "Token2 is 0");
+        require(_borrow_amt > 0, "Borrow amount is 0");
 
         // Prevent token conflicts
-        require(_token0 != _token1, "Token0 and Token1 must be different");
-        require(_token1 != _token2, "Token1 and Token2 must be different");
-        require(_token2 != _token0, "Token2 and Token0 must be different");
-        require(
-            _token0 != BASE_TOKEN,
-            "Token0 cannot be base token to avoid lock conflict"
-        );
-        require(
-            _token1 != BASE_TOKEN,
-            "Token1 cannot be base token to avoid lock conflict"
-        );
-        require(
-            _token2 != BASE_TOKEN,
-            "Token2 cannot be base token to avoid lock conflict"
-        );
+        require(_token0 != _token1, "Token0 == Token1");
+        require(_token1 != _token2, "Token1 == Token2");
+        require(_token2 != _token0, "Token2 == Token0");
+        require(_token0 != BASE_TOKEN, "Token0 == Base Token");
+        require(_token1 != BASE_TOKEN, "Token1 == Base Token");
+        require(_token2 != BASE_TOKEN, "Token2 == Base Token");
 
         // Check all required pools exist
         address pairBorrow = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
             _token0,
             BASE_TOKEN
         );
-        require(
-            pairBorrow != address(0),
-            "TOKEN0-BASE_TOKEN Pool does not exist"
-        );
+        require(pairBorrow != address(0), "TOKEN0-BASE_TOKEN pool not exist");
 
         address pair01 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
             _token0,
             _token1
         );
-        require(pair01 != address(0), "TOKEN0-TOKEN1 Pool does not exist");
+        require(pair01 != address(0), "TOKEN0-TOKEN1 pool not exist");
 
         address pair12 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
             _token1,
             _token2
         );
-        require(pair12 != address(0), "TOKEN1-TOKEN2 Pool does not exist");
+        require(pair12 != address(0), "TOKEN1-TOKEN2 pool not exist");
 
         address pair20 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
             _token2,
             _token0
         );
-        require(pair20 != address(0), "TOKEN2-TOKEN0 Pool does not exist");
+        require(pair20 != address(0), "TOKEN2-TOKEN0 pool not exist");
 
         // this can reduce one getPair call
         return pairBorrow;
@@ -280,9 +239,24 @@ contract FlashSwap is ReentrancyGuard {
         uint256 _borrow_amt,
         address _token1,
         address _token2,
-        uint256 _deadlineMinutes
+        uint256 _deadlineMinutes,
+        uint256[] calldata _slippageValues
     ) external {
-        require(msg.sender == owner, "Only owner can initiate arbitrage");
+        require(msg.sender == owner, "!owner");
+
+        // Validate slippage array if provided
+        if (_slippageValues.length > 0) {
+            require(
+                _slippageValues.length == 3,
+                "Must provide 3 slippage values or none"
+            );
+            for (uint i = 0; i < _slippageValues.length; i++) {
+                require(
+                    _slippageValues[i] >= 990 && _slippageValues[i] <= 999,
+                    "Slippage should be in [990,999]"
+                );
+            }
+        }
 
         address pair = validateArbitrageParameters(
             _token0,
@@ -328,25 +302,28 @@ contract FlashSwap is ReentrancyGuard {
             token0,
             token1
         );
-        require(msg.sender == pair, "The sender needs to match the pair");
-        require(_sender == address(this), "Sender should match this contract");
+        require(msg.sender == pair, "msg.sender != pair");
+        require(_sender == address(this), "_sender != contract address");
 
         // Decode data for calculating the repayment
-        (address tokenBorrow, uint256 amount, address myAccountAddress) = abi
-            .decode(_data, (address, uint256, address));
+        (
+            address tokenBorrow,
+            uint256 borrowAmount,
+            address myAccountAddress
+        ) = abi.decode(_data, (address, uint256, address));
         if (debugMode) {
-            emit DebugFlashLoanReceived(tokenBorrow, amount);
+            emit DebugFlashLoanReceived(tokenBorrow, borrowAmount);
         }
 
         // Calculate the amount to repay at the end
-        uint256 fee = ((amount * 3) / 997) + 1; // 0.3% ~ 0.4%
-        uint256 amountToRepay = amount + fee;
+        uint256 fee = ((borrowAmount * 3) / 997) + 1; // 0.3%
+        uint256 amountToRepay = borrowAmount + fee;
 
         // DO TRIANGLE ARBITRAGE
         // Assign loan amount
         uint256 loanAmount = _amount0 > 0 ? _amount0 : _amount1;
         // Verify loan amount matches the expected amount
-        require(loanAmount == amount, "Flash loan amount mismatch");
+        require(loanAmount == borrowAmount, "loan amount mismatch");
 
         if (debugMode) {
             (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(pair)
@@ -366,7 +343,7 @@ contract FlashSwap is ReentrancyGuard {
 
         // Place Trades
         // Trade: TOKEN0 -> TOKEN1
-        uint256 trade1AcquiredCoin = placeTrade(TOKEN0, TOKEN1, loanAmount);
+        uint256 trade1AcquiredCoin = placeTrade(TOKEN0, TOKEN1, loanAmount, 1);
         if (debugMode) {
             emit DebugTradeExecuted(
                 1,
@@ -381,7 +358,8 @@ contract FlashSwap is ReentrancyGuard {
         uint256 trade2AcquiredCoin = placeTrade(
             TOKEN1,
             TOKEN2,
-            trade1AcquiredCoin
+            trade1AcquiredCoin,
+            2
         );
         if (debugMode) {
             emit DebugTradeExecuted(
@@ -397,7 +375,8 @@ contract FlashSwap is ReentrancyGuard {
         uint256 trade3AcquiredCoin = placeTrade(
             TOKEN2,
             TOKEN0,
-            trade2AcquiredCoin
+            trade2AcquiredCoin,
+            3
         );
         if (debugMode) {
             emit DebugTradeExecuted(
@@ -413,7 +392,7 @@ contract FlashSwap is ReentrancyGuard {
         bool profCheck = checkProfitability(amountToRepay, trade3AcquiredCoin);
         emit ArbitrageExecuted(
             tokenBorrow,
-            amount,
+            borrowAmount,
             trade3AcquiredCoin,
             trade3AcquiredCoin > amountToRepay
                 ? trade3AcquiredCoin - amountToRepay
@@ -421,7 +400,7 @@ contract FlashSwap is ReentrancyGuard {
             profCheck
         );
         if (!testMode) {
-            require(profCheck, "Arbitrage not profitable - trade cancelled");
+            require(profCheck, "Not Profitable!");
         }
 
         // Pay Loan Back
@@ -436,6 +415,60 @@ contract FlashSwap is ReentrancyGuard {
                 );
             }
         }
+
+        // save gas fee
+        delete slippageValues;
+    }
+
+    // PLACE A TRADE
+    function placeTrade(
+        address _fromToken,
+        address _toToken,
+        uint256 _amountIn,
+        uint8 _tradeIndex
+    ) private returns (uint256) {
+        address pair = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
+            _fromToken,
+            _toToken
+        );
+        require(pair != address(0), "!pool");
+
+        // Calculate Amount Out
+        address[] memory path = new address[](2);
+        path[0] = _fromToken;
+        path[1] = _toToken;
+
+        uint256 expectedAmount = IUniswapV2Router01(PANCAKE_ROUTER)
+            .getAmountsOut(_amountIn, path)[1];
+
+        // Determine which slippage value to use
+        uint256 slippage;
+        if (slippageValues.length == 3) {
+            // Use the custom slippage for this trade
+            slippage = slippageValues[_tradeIndex];
+        } else {
+            // Fallback to default slippage
+            slippage = defaultSlippage;
+        }
+
+        // Add slippage tolerance
+        uint256 amountOutMin = (expectedAmount * slippage) / 1000;
+
+        uint256 currentDeadline = block.timestamp +
+            (deadlineMinutes * 1 minutes);
+        // Swap to another token
+        uint256 amountReceived = IUniswapV2Router01(PANCAKE_ROUTER)
+            .swapExactTokensForTokens(
+                _amountIn,
+                amountOutMin,
+                path,
+                address(this),
+                currentDeadline
+            )[1];
+
+        require(amountReceived > 0, "Aborted Tx: Trade returned zero");
+
+        return amountReceived;
     }
 
     function debugAllPoolReserves() private {
