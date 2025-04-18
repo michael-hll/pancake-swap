@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-//import "hardhat/console.sol";
 import "./libraries/UniswapV2Library.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-// import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./interfaces/IUniswapV2Pair.sol";
@@ -166,8 +164,6 @@ contract FlashSwap is ReentrancyGuard {
         uint256 expectedAmount = IUniswapV2Router01(PANCAKE_ROUTER)
             .getAmountsOut(_amountIn, path)[1];
 
-        //console.log("expectedAmount", expectedAmount);
-
         // Add slippage tolerance
         uint256 amountOutMin = (expectedAmount * 997) / 1000; // 0.3% slippage max
 
@@ -182,9 +178,6 @@ contract FlashSwap is ReentrancyGuard {
                 address(this),
                 currentDeadline
             )[1];
-
-        //console.log("Actually received:", amountReceived);
-        //console.log("Slippage experienced:", expectedAmount - amountReceived);
 
         require(amountReceived > 0, "Aborted Tx: Trade returned zero");
 
@@ -349,8 +342,7 @@ contract FlashSwap is ReentrancyGuard {
         uint256 fee = ((amount * 3) / 997) + 1; // 0.3% ~ 0.4%
         uint256 amountToRepay = amount + fee;
 
-        // DO ARBITRAGE
-
+        // DO TRIANGLE ARBITRAGE
         // Assign loan amount
         uint256 loanAmount = _amount0 > 0 ? _amount0 : _amount1;
         // Verify loan amount matches the expected amount
