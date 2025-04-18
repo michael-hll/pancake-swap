@@ -100,7 +100,11 @@ export function findArbitrageOpportunities() {
               destPool
             );
 
-            if (profit && profit.profitPercent > config.MIN_PROFIT_THRESHOLD) {
+            if (
+              profit &&
+              profit.profitPercent >
+                (config.INPUT_ARGS.percent ?? config.MIN_PROFIT_THRESHOLD)
+            ) {
               opportunities.push(profit);
               // Update last profit found time
               config.state.lastProfitFound = Date.now();

@@ -1,4 +1,5 @@
 import {ethers} from "hardhat";
+import {InputsArgs} from "./types";
 
 // Constants
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
@@ -19,6 +20,8 @@ export const BATCH_SIZE = 10;
 // Profit thresholds
 export const MIN_PROFIT_THRESHOLD = 0.005;
 export const MIN_LIQUIDITY_USD = 50000;
+
+export const INPUT_ARGS: InputsArgs = {};
 
 // ABIs
 export const FACTORY_ABI = [

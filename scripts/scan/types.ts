@@ -1,3 +1,7 @@
+export interface InputsArgs {
+  percent?: number;
+}
+
 export interface TokenInfo {
   address: string;
   name: string;
