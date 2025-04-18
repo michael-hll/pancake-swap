@@ -2,13 +2,18 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
-    "deploy": "npx hardhat run scripts/deploy.js --network testnet",
-    "flat": "npx hardhat flatten contracts/FlashSwap.sol > FlashSwapFlat.sol"
+    "deploy": "npx hardhat run scripts/deploy.ts --network testnet",
+    "flat": "npx hardhat flatten contracts/FlashSwap.sol > FlashSwapFlat.sol",
+    "start": "npx hardhat run scripts/start-arbitrage.ts --network testnet",
+    "start-simulation": "npx hardhat run scripts/start-simulation.ts --network testnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@types/js-yaml": "^4.0.9",
     "hardhat": "^2.23.0",
     "js-yaml": "^4.1.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.9.3"
   }
 }

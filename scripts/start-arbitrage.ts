@@ -13,6 +13,50 @@ const TESTNET_TOKENS = {
   WBNB: "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd", // WBNB on testnet
 };
 
+interface BaseEvent {
+  type: string;
+  order: number;
+}
+
+interface FlashLoanReceivedEvent extends BaseEvent {
+  type: "FlashLoanReceived";
+  token: string;
+  amount: bigint;
+}
+
+interface PoolLiquidityEvent extends BaseEvent {
+  type: "PoolLiquidity";
+  pair: string;
+  token0: string;
+  token1: string;
+  reserve0: bigint;
+  reserve1: bigint;
+}
+
+interface TradeExecutedEvent extends BaseEvent {
+  type: "TradeExecuted";
+  tradeNumber: number;
+  fromToken: string;
+  toToken: string;
+  amountIn: bigint;
+  amountOut: bigint;
+}
+
+interface ArbitrageExecutedEvent extends BaseEvent {
+  type: "ArbitrageExecuted";
+  tokenBorrowed: string;
+  amountBorrowed: bigint;
+  amountReturned: bigint;
+  profit: bigint;
+  success: boolean;
+}
+
+type ArbitrageEvent =
+  | FlashLoanReceivedEvent
+  | PoolLiquidityEvent
+  | TradeExecutedEvent
+  | ArbitrageExecutedEvent;
+
 /**
  * Creates a readline interface for user input
  */
@@ -140,40 +184,164 @@ async function executeArbitrage(
 }
 
 /**
- * Processes the transaction receipt and extracts arbitrage events
+ * Processes the transaction receipt and extracts all relevant events
  */
 function processArbitrageEvents(receipt: any, flashSwap: FlashSwap) {
   console.log("----------------------------------------------------");
   console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
   console.log(`Gas used: ${receipt.gasUsed}`);
 
-  // Check for ArbitrageExecuted event
-  return receipt.logs
-    .filter((log: any) => {
-      try {
-        return flashSwap.interface.parseLog(log)?.name === "ArbitrageExecuted";
-      } catch {
-        return false;
-      }
-    })
+  console.log("\n📋 EXECUTION FLOW:");
+
+  // Parse all events in chronological order
+  const allEvents = receipt.logs
     .map((log: any) => {
       try {
         const parsedLog = flashSwap.interface.parseLog(log);
-        if (!parsedLog || parsedLog.name !== "ArbitrageExecuted") {
-          return null;
+        if (!parsedLog) return null;
+
+        // Return different structures based on event type
+        switch (parsedLog.name) {
+          case "DebugFlashLoanReceived":
+            return {
+              type: "FlashLoanReceived",
+              order: 1,
+              token: parsedLog.args.token,
+              amount: parsedLog.args.amount,
+            };
+
+          case "DebugPoolLiquidity":
+            return {
+              type: "PoolLiquidity",
+              order: 2,
+              pair: parsedLog.args.pair,
+              token0: parsedLog.args.token0,
+              token1: parsedLog.args.token1,
+              reserve0: parsedLog.args.reserve0,
+              reserve1: parsedLog.args.reserve1,
+            };
+
+          case "DebugTradeExecuted":
+            return {
+              type: "TradeExecuted",
+              order: 3 + Number(parsedLog.args.tradeNumber),
+              tradeNumber: Number(parsedLog.args.tradeNumber),
+              fromToken: parsedLog.args.fromToken,
+              toToken: parsedLog.args.toToken,
+              amountIn: parsedLog.args.amountIn,
+              amountOut: parsedLog.args.amountOut,
+            };
+
+          case "ArbitrageExecuted":
+            return {
+              type: "ArbitrageExecuted",
+              order: 10, // Always display last
+              tokenBorrowed: parsedLog.args.tokenBorrowed,
+              amountBorrowed: parsedLog.args.amountBorrowed,
+              amountReturned: parsedLog.args.amountReturned,
+              profit: parsedLog.args.profit,
+              success: parsedLog.args.success,
+            };
+
+          default:
+            return null;
         }
-        return {
-          tokenBorrowed: parsedLog.args.tokenBorrowed,
-          amountBorrowed: parsedLog.args.amountBorrowed,
-          amountReturned: parsedLog.args.amountReturned,
-          profit: parsedLog.args.profit,
-          success: parsedLog.args.success,
-        };
       } catch {
         return null;
       }
     })
-    .filter((event: any): event is NonNullable<typeof event> => event !== null);
+    .filter((event: ArbitrageEvent) => event !== null)
+    .sort((a: ArbitrageEvent, b: ArbitrageEvent) => a.order - b.order || 0); // Sort by order
+
+  // Display all events
+  if (allEvents.length > 0) {
+    // Extract arbitrage results for return value
+    const arbitrageEvents = allEvents.filter(
+      (event: ArbitrageEvent) => event.type === "ArbitrageExecuted"
+    );
+
+    // Process each event type
+    allEvents.forEach((event: ArbitrageEvent) => {
+      switch (event.type) {
+        case "FlashLoanReceived":
+          console.log("\n🔄 FLASH LOAN RECEIVED:");
+          console.log(`Token: ${event.token}`);
+          console.log(`Amount: ${ethers.formatUnits(event.amount, 18)}`);
+          break;
+
+        case "PoolLiquidity":
+          console.log("\n💧 POOL LIQUIDITY:");
+          console.log(`Pair: ${event.pair}`);
+          console.log(`Token0: ${event.token0}`);
+          console.log(`Token1: ${event.token1}`);
+          console.log(`Reserve0: ${ethers.formatUnits(event.reserve0, 18)}`);
+          console.log(`Reserve1: ${ethers.formatUnits(event.reserve1, 18)}`);
+          break;
+
+        case "TradeExecuted":
+          console.log(`\n🔄 TRADE ${event.tradeNumber}:`);
+          console.log(`From: ${event.fromToken}`);
+          console.log(`To: ${event.toToken}`);
+          console.log(`Amount In: ${ethers.formatUnits(event.amountIn, 18)}`);
+          console.log(`Amount Out: ${ethers.formatUnits(event.amountOut, 18)}`);
+          // Calculate and display price impact
+          const priceImpact = calculatePriceImpact(
+            event.amountIn,
+            event.amountOut
+          );
+          console.log(`Rate: 1 token = ${priceImpact.rate} tokens`);
+          break;
+
+        case "ArbitrageExecuted":
+          console.log("\n✅ ARBITRAGE RESULTS:");
+          console.log(`Token Borrowed: ${event.tokenBorrowed}`);
+          console.log(
+            `Amount Borrowed: ${ethers.formatUnits(event.amountBorrowed, 18)}`
+          );
+          console.log(
+            `Amount Returned: ${ethers.formatUnits(event.amountReturned, 18)}`
+          );
+          console.log(`Profit: ${ethers.formatUnits(event.profit, 18)}`);
+          console.log(`Success: ${event.success}`);
+
+          // Calculate ROI
+          const roi = calculateROI(event.amountBorrowed, event.profit);
+          console.log(`ROI: ${roi}%`);
+          break;
+      }
+    });
+
+    return arbitrageEvents;
+  } else {
+    console.log("No events found in transaction");
+    return [];
+  }
+}
+
+/**
+ * Calculates price impact from a trade
+ */
+function calculatePriceImpact(
+  amountIn: bigint,
+  amountOut: bigint
+): {rate: string} {
+  if (amountIn === 0n) return {rate: "0"};
+
+  // Calculate tokens received per token spent
+  const rawRate = Number(amountOut) / Number(amountIn);
+  return {
+    rate: rawRate.toFixed(6),
+  };
+}
+
+/**
+ * Calculates return on investment
+ */
+function calculateROI(amountBorrowed: bigint, profit: bigint): string {
+  if (amountBorrowed === 0n) return "0";
+
+  const roi = (Number(profit) / Number(amountBorrowed)) * 100;
+  return roi.toFixed(2);
 }
 
 /**
@@ -309,7 +477,7 @@ async function main() {
     console.log("----------------------------------------------------");
     console.log("Review arbitrage parameters:");
     console.log(`Contract: ${contractAddress}`);
-    console.log(`Token0 (to borrow): ${token0}`);
+    console.log(`Token0: ${token0}`);
     console.log(`Amount to borrow: ${ethers.formatUnits(borrowAmount, 18)}`);
     console.log(`Token1: ${token1}`);
     console.log(`Token2: ${token2}`);

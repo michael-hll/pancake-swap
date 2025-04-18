@@ -7,6 +7,7 @@ async function main() {
   const WBNB = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
   const CAKE = "0xFa60D973F7642B748046464e165A65B7323b0DEE";
   const USDT = "0x7ef95a0FEE0Dd31b22626fA2e10Ee6A223F8a684";
+  const USDC = "0x64544969ed7EBf5f083679233325356EbE738930";
 
   // Factory ABI (just the getPair function)
   const factoryAbi = [
@@ -15,7 +16,7 @@ async function main() {
   const factory = new ethers.Contract(FACTORY, factoryAbi, ethers.provider);
 
   const TOKEN0 = BUSD;
-  const TOKEN1 = USDT;
+  const TOKEN1 = USDC;
 
   // Get the pair address
   const pairAddress = await factory.getPair(TOKEN0, TOKEN1);

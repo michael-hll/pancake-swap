@@ -17,7 +17,7 @@ export let RANDOM_END = 10000; // Maximum pool index to consider (adjustable)
 export const BATCH_SIZE = 10;
 
 // Profit thresholds
-export const MIN_PROFIT_THRESHOLD = 0.0025;
+export const MIN_PROFIT_THRESHOLD = 0.005;
 export const MIN_LIQUIDITY_USD = 50000;
 
 // ABIs

@@ -41,7 +41,7 @@ if (fs.existsSync(privateKeyPath)) {
     ) {
       throw new Error("Invalid private key format");
     }
-    console.log("Private key loaded from ./private-key.yaml");
+    //console.log("Private key loaded from ./private-key.yaml");
   } catch (error) {
     console.warn("Warning: Could not parse private-key.yaml file", error);
     // Fallback to empty key
@@ -99,8 +99,6 @@ export default config;
 /* sample :
 ╭─mich@HanLaptop ~/.../dev/flashswap/flash-loans/pancake-swap ‹main●› 
 ╰─$ npx hardhat run scripts/deploy.ts --network testnet
-Private key loaded from ./private-key.yaml
-Private key loaded from ./private-key.yaml
 ----------------------------------------------------
 Deploying FlashSwap with the account: 0xD7050075F4A2959eDA461a1f4A-xxxxxxxxxxxxx
 Account balance: 0.3 BNB

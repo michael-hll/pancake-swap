@@ -1,24 +1,25 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.6.8;
+pragma solidity ^0.8.0;
 
 //import "hardhat/console.sol";
-
 import "./libraries/UniswapV2Library.sol";
-import "./libraries/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+// import "@openzeppelin/contracts/utils/Address.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "./interfaces/IUniswapV2Pair.sol";
 import "./interfaces/IUniswapV2Router01.sol";
 import "./interfaces/IUniswapV2Router02.sol";
 import "./interfaces/IUniswapV2Factory.sol";
-import "./interfaces/IERC20.sol";
 
 /// @title FlashSwap - PancakeSwap V2 Flash Loan Arbitrage Contract
 /// @notice This contract is designed for PancakeSwap V2
 /// @dev Functions will not work with V3 pools
-contract FlashSwap {
+contract FlashSwap is ReentrancyGuard {
     using SafeERC20 for IERC20;
     address private owner;
     bool private testMode;
+    bool private debugMode;
     bool private locked;
     uint256 private deadlineMinutes = 5;
 
@@ -26,7 +27,7 @@ contract FlashSwap {
     address private PANCAKE_ROUTER;
     address private BASE_TOKEN;
 
-    constructor(address _factory, address _router, address _baseToken) public {
+    constructor(address _factory, address _router, address _baseToken) {
         owner = msg.sender;
         PANCAKE_FACTORY = _factory;
         PANCAKE_ROUTER = _router;
@@ -45,13 +46,21 @@ contract FlashSwap {
         uint256 profit,
         bool success
     );
-
-    modifier NoReentrantGuard() {
-        require(!locked, "ReentrancyGuard: reentrant call");
-        locked = true;
-        _;
-        locked = false;
-    }
+    event DebugFlashLoanReceived(address token, uint256 amount);
+    event DebugTradeExecuted(
+        uint8 tradeNumber,
+        address fromToken,
+        address toToken,
+        uint256 amountIn,
+        uint256 amountOut
+    );
+    event DebugPoolLiquidity(
+        address pair,
+        address token0,
+        address token1,
+        uint256 reserve0,
+        uint256 reserve1
+    );
 
     function setTestMode(bool _testMode) external {
         require(msg.sender == owner, "Only owner can set test mode");
@@ -61,6 +70,16 @@ contract FlashSwap {
     function getTestMode() external view returns (bool) {
         require(msg.sender == owner, "Only owner can get test mode");
         return testMode;
+    }
+
+    function setDebugMode(bool _debugMode) external {
+        require(msg.sender == owner, "Only owner can set debug mode");
+        debugMode = _debugMode;
+    }
+
+    function getDebugMode() external view returns (bool) {
+        require(msg.sender == owner, "Only owner can get debug mode");
+        return debugMode;
     }
 
     function setDeadlineMinutes(uint256 _minutes) public {
@@ -285,10 +304,10 @@ contract FlashSwap {
         TOKEN0 = _token0;
         TOKEN1 = _token1;
         TOKEN2 = _token2;
-        uint256 approvalAmount = _borrow_amt * 3;
-        safeApprove(TOKEN0, address(PANCAKE_ROUTER), approvalAmount);
-        safeApprove(TOKEN1, address(PANCAKE_ROUTER), approvalAmount);
-        safeApprove(TOKEN2, address(PANCAKE_ROUTER), approvalAmount);
+        uint256 MAX_UINT = type(uint256).max;
+        safeApprove(TOKEN0, address(PANCAKE_ROUTER), MAX_UINT);
+        safeApprove(TOKEN1, address(PANCAKE_ROUTER), MAX_UINT);
+        safeApprove(TOKEN2, address(PANCAKE_ROUTER), MAX_UINT);
 
         // Figure out which token (0 or 1) has the amount and assign
         address token0 = IUniswapV2Pair(pair).token0();
@@ -308,7 +327,7 @@ contract FlashSwap {
         uint256 _amount0,
         uint256 _amount1,
         bytes calldata _data
-    ) external NoReentrantGuard {
+    ) external nonReentrant {
         // Ensure this request came from the contract
         address token0 = IUniswapV2Pair(msg.sender).token0();
         address token1 = IUniswapV2Pair(msg.sender).token1();
@@ -320,10 +339,11 @@ contract FlashSwap {
         require(_sender == address(this), "Sender should match this contract");
 
         // Decode data for calculating the repayment
-        (address tokenBorrow, uint256 amount, address myAddress) = abi.decode(
-            _data,
-            (address, uint256, address)
-        );
+        (address tokenBorrow, uint256 amount, address myAccountAddress) = abi
+            .decode(_data, (address, uint256, address));
+        if (debugMode) {
+            emit DebugFlashLoanReceived(tokenBorrow, amount);
+        }
 
         // Calculate the amount to repay at the end
         uint256 fee = ((amount * 3) / 997) + 1; // 0.3% ~ 0.4%
@@ -336,19 +356,68 @@ contract FlashSwap {
         // Verify loan amount matches the expected amount
         require(loanAmount == amount, "Flash loan amount mismatch");
 
+        if (debugMode) {
+            (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(pair)
+                .getReserves();
+            address token0Pair = IUniswapV2Pair(pair).token0();
+            address token1Pair = IUniswapV2Pair(pair).token1();
+            emit DebugPoolLiquidity(
+                pair,
+                token0Pair,
+                token1Pair,
+                reserve0,
+                reserve1
+            );
+            // emit all pool reserves
+            debugAllPoolReserves();
+        }
+
         // Place Trades
+        // Trade: TOKEN0 -> TOKEN1
         uint256 trade1AcquiredCoin = placeTrade(TOKEN0, TOKEN1, loanAmount);
+        if (debugMode) {
+            emit DebugTradeExecuted(
+                1,
+                TOKEN0,
+                TOKEN1,
+                loanAmount,
+                trade1AcquiredCoin
+            );
+        }
+
+        // Trade: TOKEN1 -> TOKEN2
         uint256 trade2AcquiredCoin = placeTrade(
             TOKEN1,
             TOKEN2,
             trade1AcquiredCoin
         );
+        if (debugMode) {
+            emit DebugTradeExecuted(
+                2,
+                TOKEN1,
+                TOKEN2,
+                trade1AcquiredCoin,
+                trade2AcquiredCoin
+            );
+        }
+
+        // Trade: TOKEN2 -> TOKEN0
         uint256 trade3AcquiredCoin = placeTrade(
             TOKEN2,
             TOKEN0,
             trade2AcquiredCoin
         );
+        if (debugMode) {
+            emit DebugTradeExecuted(
+                3,
+                TOKEN2,
+                TOKEN0,
+                trade2AcquiredCoin,
+                trade3AcquiredCoin
+            );
+        }
 
+        // Profit Check
         bool profCheck = checkProfitability(amountToRepay, trade3AcquiredCoin);
         emit ArbitrageExecuted(
             tokenBorrow,
@@ -366,14 +435,57 @@ contract FlashSwap {
         // Pay Loan Back
         IERC20(tokenBorrow).safeTransfer(pair, amountToRepay);
 
-        //  Pay Myself
+        // Pay Myself
         if (profCheck) {
             if (trade3AcquiredCoin > amountToRepay) {
                 IERC20(TOKEN0).safeTransfer(
-                    myAddress,
+                    myAccountAddress,
                     trade3AcquiredCoin - amountToRepay
                 );
             }
+        }
+    }
+
+    function debugAllPoolReserves() private {
+        // Check borrowing pool (already done in main code)
+
+        // Check TOKEN0-TOKEN1 pool
+        address pair01 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
+            TOKEN0,
+            TOKEN1
+        );
+        if (pair01 != address(0)) {
+            (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(pair01)
+                .getReserves();
+            address token0 = IUniswapV2Pair(pair01).token0();
+            address token1 = IUniswapV2Pair(pair01).token1();
+            emit DebugPoolLiquidity(pair01, token0, token1, reserve0, reserve1);
+        }
+
+        // Check TOKEN1-TOKEN2 pool
+        address pair12 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
+            TOKEN1,
+            TOKEN2
+        );
+        if (pair12 != address(0)) {
+            (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(pair12)
+                .getReserves();
+            address token0 = IUniswapV2Pair(pair12).token0();
+            address token1 = IUniswapV2Pair(pair12).token1();
+            emit DebugPoolLiquidity(pair12, token0, token1, reserve0, reserve1);
+        }
+
+        // Check TOKEN2-TOKEN0 pool
+        address pair20 = IUniswapV2Factory(PANCAKE_FACTORY).getPair(
+            TOKEN2,
+            TOKEN0
+        );
+        if (pair20 != address(0)) {
+            (uint112 reserve0, uint112 reserve1, ) = IUniswapV2Pair(pair20)
+                .getReserves();
+            address token0 = IUniswapV2Pair(pair20).token0();
+            address token1 = IUniswapV2Pair(pair20).token1();
+            emit DebugPoolLiquidity(pair20, token0, token1, reserve0, reserve1);
         }
     }
 }

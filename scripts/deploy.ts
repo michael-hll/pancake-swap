@@ -27,7 +27,7 @@ async function main() {
   console.log(`Network: ${name} (Chain ID: ${chainId})`);
 
   // Set addresses based on network
-  let factoryAddress, routerAddress, wbnbAddress;
+  let factoryAddress, routerAddress, baseTokenAddress;
   let verifyContract = false;
 
   if (chainId === 56n) {
@@ -35,7 +35,7 @@ async function main() {
     // BSC Mainnet
     factoryAddress = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
     routerAddress = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
-    wbnbAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
+    baseTokenAddress = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
     //verifyContract = true;
     console.log("Using BSC Mainnet addresses");
   } else if (chainId === 97n) {
@@ -43,7 +43,7 @@ async function main() {
     // BSC Testnet
     factoryAddress = "0x6725F303b657a9451d8BA641348b6761A6CC7a17";
     routerAddress = "0xD99D1c33F9fC3444f8101754aBC46c52416550D1";
-    wbnbAddress = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
+    baseTokenAddress = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd";
     //verifyContract = true;
     console.log("Using BSC Testnet addresses");
   } else {
@@ -53,14 +53,14 @@ async function main() {
     console.log("You'll need to manually set the correct addresses later.");
     factoryAddress = "0x0000000000000000000000000000000000000000";
     routerAddress = "0x0000000000000000000000000000000000000000";
-    wbnbAddress = "0x0000000000000000000000000000000000000000";
+    baseTokenAddress = "0x0000000000000000000000000000000000000000";
   }
 
   console.log("----------------------------------------------------");
   console.log("Deployment Configuration:");
-  console.log(`Factory Address: ${factoryAddress}`);
-  console.log(`Router Address:  ${routerAddress}`);
-  console.log(`WBNB Address:    ${wbnbAddress}`);
+  console.log(`Factory Address:   ${factoryAddress}`);
+  console.log(`Router Address:    ${routerAddress}`);
+  console.log(`BaseToken Address: ${baseTokenAddress}`);
   console.log("----------------------------------------------------");
 
   try {
@@ -72,7 +72,7 @@ async function main() {
     const flashSwapInstance = await FlashSwap.deploy(
       factoryAddress,
       routerAddress,
-      wbnbAddress
+      baseTokenAddress
     );
 
     console.log("Transaction sent! Waiting for confirmation...");
@@ -93,11 +93,11 @@ async function main() {
     const deploymentInfo = {
       network: name,
       chainId: Number(chainId), // Convert BigInt to Number for JSON
-      contractAddress: contractAddress,
+      contractAddress,
       deploymentTime: new Date().toISOString(),
       factoryAddress,
       routerAddress,
-      wbnbAddress,
+      baseTokenAddress,
     };
 
     const deployDir = path.join(__dirname, "../deployments");
@@ -167,7 +167,11 @@ async function main() {
       try {
         await run("verify:verify", {
           address: contractAddress,
-          constructorArguments: [factoryAddress, routerAddress, wbnbAddress],
+          constructorArguments: [
+            factoryAddress,
+            routerAddress,
+            baseTokenAddress,
+          ],
         });
         console.log("Contract verified successfully! ✅");
       } catch (error) {
