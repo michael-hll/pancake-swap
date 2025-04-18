@@ -110,7 +110,7 @@ export async function loadPoolData(
       const now = new Date();
       const secondsSinceUpdate = (now.getTime() - lastUpdate.getTime()) / 1000;
 
-      // Only refresh if data is older than 60 seconds
+      // Only refresh if data is older
       if (secondsSinceUpdate < config.FULL_REFRESH_INTERVAL / 1000) {
         return existing;
       }

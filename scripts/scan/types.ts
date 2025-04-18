@@ -1,5 +1,6 @@
 export interface InputsArgs {
   percent?: number;
+  pools?: number;
 }
 
 export interface TokenInfo {

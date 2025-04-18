@@ -25,7 +25,7 @@ function ensureDataDirectory() {
  */
 export function saveArbitrageOpportunities(
   opportunities: ArbitrageOpportunity[],
-  limit: number = 20
+  limit: number = 100
 ) {
   if (!opportunities || opportunities.length === 0) {
     return; // Don't save if no opportunities

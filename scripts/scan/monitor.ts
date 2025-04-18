@@ -90,6 +90,7 @@ export async function startMonitoring() {
       );
       poolUtils.resetPoolSelection();
       loadInitialPoolData();
+      console.log("poolset was reset!");
     }
   }, 1000 * 60); // Check every minute
 
@@ -206,6 +207,7 @@ export async function startMonitoring() {
             ).toFixed(4)}%`
           );
         });
+        fileUtils.saveArbitrageOpportunities(opportunities);
       }
     } catch (error) {
       console.error("Error during priority refresh:", error);

@@ -1,15 +1,23 @@
 import * as scannerOps from "./monitor";
-import {INPUT_ARGS, MIN_PROFIT_THRESHOLD} from "./config";
+import {INPUT_ARGS, MIN_PROFIT_THRESHOLD, POOLS_TO_SAMPLE} from "./config";
 
 async function main() {
   if (process.env.percent) {
     INPUT_ARGS.percent = Number.parseFloat(process.env.percent);
   }
+  if (process.env.pools) {
+    INPUT_ARGS.pools = Number.parseInt(process.env.pools);
+  }
   console.log("Starting PancakeSwap V2 Arbitrage Scanner...");
   console.log(
     `Using ${
-      INPUT_ARGS.percent ?? MIN_PROFIT_THRESHOLD
+      (INPUT_ARGS.percent ?? MIN_PROFIT_THRESHOLD) * 100
     }% as the minimum profit threshold`
+  );
+  console.log(
+    `Using ${
+      INPUT_ARGS.pools ?? POOLS_TO_SAMPLE
+    } as the number of pools to sample`
   );
 
   // Start the monitoring
