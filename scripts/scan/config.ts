@@ -7,10 +7,10 @@ export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;
 
 // Timing parameters (ms)
-export const BATCH_SHORT_DELAY = 1000 * 5;
+export const BATCH_SHORT_DELAY = 1000 * 10;
 export const FULL_REFRESH_INTERVAL = 1000 * 60;
-export const PRIORITY_REFRESH_INTERVAL = 1000 * 10;
-export const RESET_INTERVAL = 1000 * 60 * 30;
+export const PRIORITY_REFRESH_INTERVAL = 1000 * 15;
+export const RESET_INTERVAL = 1000 * 60 * 25;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
@@ -58,15 +58,15 @@ export const PRIORITY_TOKENS = {
   // Additional high-liquidity tokens
   USDC: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", // USD Coin
   DAI: "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3", // Dai Stablecoin
-  DOT: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", // Binance-Peg Polkadot
-  ADA: "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47", // Binance-Peg Cardano
+  //DOT: "0x7083609fCE4d1d8Dc0C979AAb8c869Ea2C873402", // Binance-Peg Polkadot
+  //ADA: "0x3EE2200Efb3400fAbB9AacF31297cBdD1d435D47", // Binance-Peg Cardano
   DOGE: "0xbA2aE424d960c26247Dd6c32edC70B295c744C43", // Binance-Peg Dogecoin
-  XRP: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE", // Binance-Peg XRP
-  MATIC: "0xCC42724C6683B7E57334c4E856f4c9965ED682bD", // Binance-Peg Polygon
-  LINK: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD", // Binance-Peg ChainLink
+  //XRP: "0x1D2F0da169ceB9fC7B3144628dB156f3F6c60dBE", // Binance-Peg XRP
+  //MATIC: "0xCC42724C6683B7E57334c4E856f4c9965ED682bD", // Binance-Peg Polygon
+  //LINK: "0xF8A0BF9cF54Bb92F17374d9e9A321E6a111a51bD", // Binance-Peg ChainLink
 
-  BABY: "0x53E562b9B7E5E94b81f10e96Ee70Ad06df3D2657", // BabySwap Token
-  BSW: "0x965F527D9159dCe6288a2219DB51fc6Eef120dD1", // Biswap Token
+  //BABY: "0x53E562b9B7E5E94b81f10e96Ee70Ad06df3D2657", // BabySwap Token
+  //BSW: "0x965F527D9159dCe6288a2219DB51fc6Eef120dD1", // Biswap Token
 };
 
 // Stablecoins for liquidity calculation

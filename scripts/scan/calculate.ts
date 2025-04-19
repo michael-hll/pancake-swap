@@ -1,20 +1,15 @@
 import {ethers} from "hardhat";
-import {ArbitrageOpportunity, PoolData} from "./types";
 import {Contract} from "ethers";
+import {ArbitrageOpportunity, PoolData} from "./types";
 import * as config from "./config";
+import {saveLocalEstimatesForAnalysis} from "./file-utils";
 
 // Remove the factory import and use PancakeSwap ABI directly:
 const ROUTER_ABI = [
   "function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts)",
 ];
-
-// Simplify to use Hardhat's provider
 let router: Contract | null = null;
 
-// Helper function for delay
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// Initialize router with Hardhat provider
 async function initializeRouter(): Promise<Contract> {
   if (router) return router;
 
@@ -63,6 +58,50 @@ async function getActualTradeOutput(
     // Default fallback - assume 0.3% fee but no price impact
     return amount * 0.997;
   }
+}
+
+function calculateLocalTradeOutput(
+  amount: number,
+  path: string[],
+  reserves: {[poolAddress: string]: {reserve0: string; reserve1: string}},
+  findPoolForPair: (tokenA: string, tokenB: string) => string,
+  isToken0: (token: string, poolAddress: string) => boolean
+): number {
+  let currentAmount = amount;
+
+  // For each hop in the path (except the last token)
+  for (let i = 0; i < path.length - 1; i++) {
+    const tokenIn = path[i];
+    const tokenOut = path[i + 1];
+
+    // Find the pool for this pair
+    const poolAddress = findPoolForPair(tokenIn, tokenOut);
+    if (!poolAddress) return 0;
+
+    const poolReserves = reserves[poolAddress];
+    if (!poolReserves) return 0;
+
+    // Determine which token is token0 and which is token1
+    const isToken0In = isToken0(tokenIn, poolAddress);
+
+    if (isToken0In) {
+      // Token0 in, Token1 out
+      const reserveIn = Number(poolReserves.reserve0);
+      const reserveOut = Number(poolReserves.reserve1);
+      currentAmount =
+        (reserveOut * currentAmount * 0.997) /
+        (reserveIn + currentAmount * 0.997);
+    } else {
+      // Token1 in, Token0 out
+      const reserveIn = Number(poolReserves.reserve1);
+      const reserveOut = Number(poolReserves.reserve0);
+      currentAmount =
+        (reserveOut * currentAmount * 0.997) /
+        (reserveIn + currentAmount * 0.997);
+    }
+  }
+
+  return currentAmount;
 }
 
 // Find arbitrage opportunities using in-memory data
@@ -189,50 +228,6 @@ export async function findArbitrageOpportunities() {
   return opportunities;
 }
 
-function calculateLocalTradeOutput(
-  amount: number,
-  path: string[],
-  reserves: {[poolAddress: string]: {reserve0: string; reserve1: string}},
-  findPoolForPair: (tokenA: string, tokenB: string) => string,
-  isToken0: (token: string, poolAddress: string) => boolean
-): number {
-  let currentAmount = amount;
-
-  // For each hop in the path (except the last token)
-  for (let i = 0; i < path.length - 1; i++) {
-    const tokenIn = path[i];
-    const tokenOut = path[i + 1];
-
-    // Find the pool for this pair
-    const poolAddress = findPoolForPair(tokenIn, tokenOut);
-    if (!poolAddress) return 0;
-
-    const poolReserves = reserves[poolAddress];
-    if (!poolReserves) return 0;
-
-    // Determine which token is token0 and which is token1
-    const isToken0In = isToken0(tokenIn, poolAddress);
-
-    if (isToken0In) {
-      // Token0 in, Token1 out
-      const reserveIn = Number(poolReserves.reserve0);
-      const reserveOut = Number(poolReserves.reserve1);
-      currentAmount =
-        (reserveOut * currentAmount * 0.997) /
-        (reserveIn + currentAmount * 0.997);
-    } else {
-      // Token1 in, Token0 out
-      const reserveIn = Number(poolReserves.reserve1);
-      const reserveOut = Number(poolReserves.reserve0);
-      currentAmount =
-        (reserveOut * currentAmount * 0.997) /
-        (reserveIn + currentAmount * 0.997);
-    }
-  }
-
-  return currentAmount;
-}
-
 // Calculate arbitrage profit for a triangular path
 export async function calculateTriangularArbitrage(
   startToken: string,
@@ -256,6 +251,7 @@ export async function calculateTriangularArbitrage(
     let bestNetProfit = 0;
     let hasAnyProfitableAmount = false; // Flag to track if any amount is profitable
     let bestGasCost = 0;
+    let localEstimatedProfit = false;
 
     // Create reserves object for local calculation
     const reserves: {
@@ -328,6 +324,7 @@ export async function calculateTriangularArbitrage(
 
         // Only do on-chain simulation if local calculation shows potentially significant profit
         if (estimatedProfitPercent > config.MIN_PROFIT_THRESHOLD) {
+          localEstimatedProfit = true;
           const endAmount = await getActualTradeOutput(amount, tradePath);
 
           // Calculate flash loan fee and profit
@@ -502,6 +499,25 @@ export async function calculateTriangularArbitrage(
         testResults: testResults,
         bestAmount: bestAmount,
       };
+    }
+
+    // save localEstimatedProfit = true case
+    // which means the actual trade was not profitable
+    if (localEstimatedProfit && !hasAnyProfitableAmount) {
+      // This case is interesting for analysis - local calculation showed promise
+      // but on-chain verification didn't find profit
+      saveLocalEstimatesForAnalysis(
+        startToken,
+        midToken,
+        destToken,
+        testResults,
+        pool1,
+        pool2,
+        pool3
+      );
+      console.log(
+        `Saved local estimate analysis: Local calc was profitable but router calc wasn't`
+      );
     }
 
     return null;
