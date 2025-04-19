@@ -22,6 +22,8 @@ export const BATCH_SIZE = 10;
 export const MIN_PROFIT_THRESHOLD = 0.005;
 export const MIN_LIQUIDITY_USD = 50000;
 
+// Add this with your other constants
+export const TEST_AMOUNTS = [10, 100, 1000, 10000];
 export const INPUT_ARGS: InputsArgs = {};
 
 // ABIs

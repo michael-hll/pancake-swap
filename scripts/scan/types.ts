@@ -38,4 +38,18 @@ export interface ArbitrageOpportunity {
   estimatedGasCost: number;
   netProfit: number;
   timestamp: string;
+  // fields for test amounts
+  testAmounts?: number[];
+  testResults?: {
+    amount: number;
+    profit: number;
+    profitPercent: number;
+    netProfit: number;
+    expected: {
+      midAmount: number;
+      destAmount: number;
+      endAmount: number;
+    };
+  }[];
+  bestAmount: number; // Optimal amount with highest profit percentage
 }

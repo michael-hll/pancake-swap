@@ -2,6 +2,7 @@ import * as config from "./config";
 import * as poolUtils from "./pool-utils";
 import * as arbitrageUtils from "./calculate";
 import * as fileUtils from "./file-utils";
+import {ArbitrageOpportunity} from "./types";
 
 // Load initial pool data for important pools
 export async function loadInitialPoolData() {
@@ -117,42 +118,7 @@ export async function startMonitoring() {
 
         // Log profitable opportunities
         if (opportunities.length > 0) {
-          console.log(
-            `\n🔍 Found ${opportunities.length} potential arbitrage opportunities:`
-          );
-
-          opportunities.slice(0, 5).forEach((opp, i) => {
-            console.log(
-              `\n#${i + 1}: ${opp.path[0].tokenInSymbol} → ${
-                opp.path[0].tokenOutSymbol
-              } → ${opp.path[1].tokenOutSymbol} → ${opp.path[2].tokenOutSymbol}`
-            );
-            console.log(
-              `   Profit: ${(opp.profitPercent * 100).toFixed(
-                4
-              )}% (${opp.expectedProfit.toFixed(6)} ${
-                opp.path[0].tokenInSymbol
-              })`
-            );
-            console.log(
-              `   Gas Cost: ~${opp.estimatedGasCost.toFixed(6)} ${
-                opp.path[0].tokenInSymbol
-              }`
-            );
-            console.log(
-              `   Net Profit: ${opp.netProfit.toFixed(6)} ${
-                opp.path[0].tokenInSymbol
-              }`
-            );
-            console.log(
-              `   Pool Addresses: ${opp.path
-                .map((p) => p.poolAddress)
-                .join(" → ")}`
-            );
-          });
-
-          // Optional: Save to file for reference
-          fileUtils.saveArbitrageOpportunities(opportunities);
+          displayOpportunity(opportunities, 5); // Show up to 5 opportunities
         } else {
           console.log(
             "No profitable arbitrage opportunities found in this scan."
@@ -195,22 +161,93 @@ export async function startMonitoring() {
       const opportunities = arbitrageUtils.findArbitrageOpportunities();
 
       if (opportunities.length > 0) {
+        displayOpportunity(opportunities, 5); // Show up to 5 opportunities
+      } else {
         console.log(
-          `\n⚡ Found ${opportunities.length} potential arbitrage opportunities in priority scan:`
+          "No profitable arbitrage opportunities found in this scan."
         );
-        opportunities.slice(0, 3).forEach((opp, i) => {
-          console.log(
-            `   #${i + 1}: ${opp.path[0].tokenInSymbol} → ${
-              opp.path[1].tokenOutSymbol
-            } → ${opp.path[2].tokenOutSymbol}: ${(
-              opp.profitPercent * 100
-            ).toFixed(4)}%`
-          );
-        });
-        fileUtils.saveArbitrageOpportunities(opportunities);
       }
     } catch (error) {
       console.error("Error during priority refresh:", error);
     }
   }, config.PRIORITY_REFRESH_INTERVAL);
+}
+
+/**
+ * Displays arbitrage opportunities in a formatted way
+ * @param opportunities List of arbitrage opportunities to display
+ * @param limit Maximum number of opportunities to display
+ */
+export function displayOpportunity(
+  opportunities: ArbitrageOpportunity[],
+  limit: number = 3
+) {
+  if (!opportunities || opportunities.length === 0) {
+    console.log("No profitable arbitrage opportunities found.");
+    return;
+  }
+
+  console.log(
+    `\n⚡ Found ${opportunities.length} potential arbitrage opportunities:`
+  );
+
+  opportunities.slice(0, limit).forEach((opp, i) => {
+    console.log(
+      `   #${i + 1}: ${opp.path[0].tokenInSymbol} → ${
+        opp.path[1].tokenOutSymbol
+      } → ${opp.path[2].tokenOutSymbol}: ${(opp.profitPercent * 100).toFixed(
+        4
+      )}%`
+    );
+
+    // Check if enhanced test data is available
+    if (opp.testResults && opp.bestAmount) {
+      // Add information about best test amount
+      const bestTestResult = opp.testResults.find(
+        (t) => t.amount === opp.bestAmount
+      );
+      if (bestTestResult) {
+        console.log(
+          `   Best Amount: ${opp.bestAmount} ${opp.path[0].tokenInSymbol} (${(
+            bestTestResult.profitPercent * 100
+          ).toFixed(4)}%)`
+        );
+
+        console.log(`   Test Results:`);
+        opp.testResults.forEach((result) => {
+          console.log(
+            `     ${result.amount} ${opp.path[0].tokenInSymbol}: ${(
+              result.profitPercent * 100
+            ).toFixed(4)}% (${result.profit.toFixed(6)} profit)`
+          );
+        });
+      }
+    } else {
+      // Display basic profit information for legacy opportunities
+      console.log(
+        `   Profit: ${(opp.profitPercent * 100).toFixed(
+          4
+        )}% (${opp.expectedProfit.toFixed(6)} ${opp.path[0].tokenInSymbol})`
+      );
+    }
+
+    console.log(
+      `   Gas Cost: ~${opp.estimatedGasCost.toFixed(6)} ${
+        opp.path[0].tokenInSymbol
+      }`
+    );
+    console.log(
+      `   Net Profit: ${opp.netProfit.toFixed(6)} ${opp.path[0].tokenInSymbol}`
+    );
+    console.log(
+      `   Pool Addresses: ${opp.path.map((p) => p.poolAddress).join(" → ")}`
+    );
+
+    // Add a blank line between opportunities for better readability
+    if (i < Math.min(limit, opportunities.length) - 1) {
+      console.log("");
+    }
+  });
+
+  fileUtils.saveArbitrageOpportunities(opportunities);
 }
