@@ -1,13 +1,13 @@
 import fs from "fs";
 import path from "path";
 import {ArbitrageOpportunity} from "./types";
+import {MAX_PROFIT_HISTORY_ITEMS} from "./config";
 
 const DATA_DIRECTORY = path.join(__dirname, "../../data");
 const OPPORTUNITIES_FILE = path.join(
   DATA_DIRECTORY,
   "arbitrage_opportunities.json"
 );
-const MAX_HISTORY_ENTRIES = 20; // Keep only the most recent 50 entries
 
 /**
  * Makes sure the data directory exists
@@ -21,7 +21,7 @@ function ensureDataDirectory() {
 /**
  * Save arbitrage opportunities to file in append mode
  * @param opportunities Array of arbitrage opportunities
- * @param limit Maximum number of opportunities to save per entry (default: 20)
+ * @param limit Maximum number of opportunities to save per entry (default: 100)
  */
 export function saveArbitrageOpportunities(
   opportunities: ArbitrageOpportunity[],
@@ -35,7 +35,11 @@ export function saveArbitrageOpportunities(
 
   // Read existing data (if any)
   let historyData: {
-    history: Array<{timestamp: string; opportunities: ArbitrageOpportunity[]}>;
+    history: Array<{
+      timestamp: string;
+      timestampLocal?: string;
+      opportunities: ArbitrageOpportunity[];
+    }>;
   } = {
     history: [],
   };
@@ -60,18 +64,23 @@ export function saveArbitrageOpportunities(
   // Add new opportunities with timestamp
   historyData.history.push({
     timestamp: new Date().toISOString(),
+    timestampLocal: new Date().toLocaleString(),
     opportunities: opportunities.slice(0, limit),
   });
 
   console.log("History data length:", historyData.history.length);
+
   // Sort the history by timestamp in descending order
   historyData.history.sort((a, b) => {
     return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
   });
 
-  // Keep only last MAX_HISTORY_ENTRIES to prevent file from growing too large
-  if (historyData.history.length > MAX_HISTORY_ENTRIES) {
-    historyData.history = historyData.history.slice(-MAX_HISTORY_ENTRIES);
+  // Keep only first MAX_HISTORY_ENTRIES (newest ones) to prevent file from growing too large
+  if (historyData.history.length > MAX_PROFIT_HISTORY_ITEMS) {
+    historyData.history = historyData.history.slice(
+      0,
+      MAX_PROFIT_HISTORY_ITEMS
+    );
   }
 
   // Write back the updated data
@@ -84,7 +93,6 @@ export function saveArbitrageOpportunities(
     )} opportunities to history file`
   );
 }
-
 /**
  * Get the most recent arbitrage opportunities from file
  * @returns The most recent opportunities or null if file doesn't exist

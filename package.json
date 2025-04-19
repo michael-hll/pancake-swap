@@ -2,10 +2,10 @@
   "scripts": {
     "compile": "npx hardhat compile",
     "test": "npx hardhat test",
-    "deploy": "npx hardhat run scripts/deploy.ts --network testnet",
+    "deploy": "npx hardhat run scripts/deploy.ts --network mainnet",
     "flat": "npx hardhat flatten contracts/FlashSwap.sol > FlashSwapFlat.sol",
     "start": "npx hardhat run scripts/start-arbitrage.ts --network testnet",
-    "start-simulation": "npx hardhat run scripts/start-simulation.ts --network testnet"
+    "start-simulation": "npx hardhat run scripts/start-simulation.ts --network mainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",

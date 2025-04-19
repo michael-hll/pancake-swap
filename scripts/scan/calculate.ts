@@ -172,7 +172,9 @@ export function calculateTriangularArbitrage(
     const destAmount = midAmount * rate2;
     const endAmount = destAmount * rate3;
 
-    const profit = endAmount - startAmount;
+    const flashLoanFee = startAmount * 0.003; // Simplified 0.3% calculation
+    const amountToRepay = startAmount + flashLoanFee;
+    const profit = endAmount - amountToRepay;
     const profitPercent = profit / startAmount;
 
     // Estimate gas cost (in the start token)

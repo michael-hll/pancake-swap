@@ -4,12 +4,13 @@ import {InputsArgs} from "./types";
 // Constants
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
+export const MAX_PROFIT_HISTORY_ITEMS = 100;
 
 // Timing parameters (seconds)
 export const SHORT_DELAY = 1000 * 5;
 export const FULL_REFRESH_INTERVAL = 1000 * 60; // 1 minute
 export const PRIORITY_REFRESH_INTERVAL = 1000 * 10; // 10 seconds
-export const RESET_INTERVAL = 1000 * 60 * 60; // 1 hour
+export const RESET_INTERVAL = 1000 * 60 * 30;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
