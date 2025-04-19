@@ -1,8 +1,72 @@
+import {ethers} from "hardhat";
 import {ArbitrageOpportunity, PoolData} from "./types";
+import {Contract} from "ethers";
 import * as config from "./config";
 
+// Remove the factory import and use PancakeSwap ABI directly:
+const ROUTER_ABI = [
+  "function getAmountsOut(uint amountIn, address[] memory path) external view returns (uint[] memory amounts)",
+];
+
+// Simplify to use Hardhat's provider
+let router: Contract | null = null;
+
+// Helper function for delay
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Initialize router with Hardhat provider
+async function initializeRouter(): Promise<Contract> {
+  if (router) return router;
+
+  try {
+    // Use Hardhat's provider directly - works on any network Hardhat is configured for
+    const provider = ethers.provider;
+    const routerAddress = "0x10ED43C718714eb63d5aA57B78B54704E256024E"; // PancakeSwap router on BSC
+
+    router = new Contract(routerAddress, ROUTER_ABI, provider);
+
+    // Verify connection
+    await provider.getBlockNumber();
+    console.log("Connected to blockchain via Hardhat provider");
+
+    return router;
+  } catch (error) {
+    console.error("Router initialization failed:", error);
+    throw new Error("Failed to initialize router");
+  }
+}
+
+async function getActualTradeOutput(
+  amount: number,
+  path: string[]
+): Promise<number> {
+  try {
+    // Get a router instance
+    const routerInstance = await initializeRouter();
+
+    // Convert amount to wei (assuming 18 decimals)
+    const amountIn = ethers.parseUnits(amount.toString(), 18);
+
+    // Get amounts out from router
+    const amountsOut = await routerInstance.getAmountsOut(amountIn, path);
+
+    // Parse the result
+    const result = Number(
+      ethers.formatUnits(amountsOut[amountsOut.length - 1], 18)
+    );
+
+    return result;
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error("Error simulating trade:", error);
+
+    // Default fallback - assume 0.3% fee but no price impact
+    return amount * 0.997;
+  }
+}
+
 // Find arbitrage opportunities using in-memory data
-export function findArbitrageOpportunities() {
+export async function findArbitrageOpportunities() {
   // Start timing
   const startTime = Date.now();
 
@@ -91,7 +155,7 @@ export function findArbitrageOpportunities() {
           if (otherToken === stablecoin) {
             // We found a triangular path!
             // Calculate potential profit
-            const profit = calculateTriangularArbitrage(
+            const profit = await calculateTriangularArbitrage(
               stablecoin,
               midToken,
               destToken,
@@ -125,156 +189,272 @@ export function findArbitrageOpportunities() {
   return opportunities;
 }
 
+function calculateLocalTradeOutput(
+  amount: number,
+  path: string[],
+  reserves: {[poolAddress: string]: {reserve0: string; reserve1: string}},
+  findPoolForPair: (tokenA: string, tokenB: string) => string,
+  isToken0: (token: string, poolAddress: string) => boolean
+): number {
+  let currentAmount = amount;
+
+  // For each hop in the path (except the last token)
+  for (let i = 0; i < path.length - 1; i++) {
+    const tokenIn = path[i];
+    const tokenOut = path[i + 1];
+
+    // Find the pool for this pair
+    const poolAddress = findPoolForPair(tokenIn, tokenOut);
+    if (!poolAddress) return 0;
+
+    const poolReserves = reserves[poolAddress];
+    if (!poolReserves) return 0;
+
+    // Determine which token is token0 and which is token1
+    const isToken0In = isToken0(tokenIn, poolAddress);
+
+    if (isToken0In) {
+      // Token0 in, Token1 out
+      const reserveIn = Number(poolReserves.reserve0);
+      const reserveOut = Number(poolReserves.reserve1);
+      currentAmount =
+        (reserveOut * currentAmount * 0.997) /
+        (reserveIn + currentAmount * 0.997);
+    } else {
+      // Token1 in, Token0 out
+      const reserveIn = Number(poolReserves.reserve1);
+      const reserveOut = Number(poolReserves.reserve0);
+      currentAmount =
+        (reserveOut * currentAmount * 0.997) /
+        (reserveIn + currentAmount * 0.997);
+    }
+  }
+
+  return currentAmount;
+}
+
 // Calculate arbitrage profit for a triangular path
-export function calculateTriangularArbitrage(
+export async function calculateTriangularArbitrage(
   startToken: string,
   midToken: string,
   destToken: string,
   pool1: PoolData,
   pool2: PoolData,
   pool3: PoolData
-): ArbitrageOpportunity | null {
+): Promise<ArbitrageOpportunity | null> {
   try {
-    // Determine exact path and rates (existing code)
+    // Determine exact path and rates
     const isPool1Token0Start = pool1.token0.address === startToken;
-    const rate1 = isPool1Token0Start
-      ? Number(
-          pool1.prices[`${pool1.token0.symbol}_PER_${pool1.token1.symbol}`]
-        )
-      : Number(
-          pool1.prices[`${pool1.token1.symbol}_PER_${pool1.token0.symbol}`]
-        );
-
     const isPool2Token0Mid = pool2.token0.address === midToken;
-    const rate2 = isPool2Token0Mid
-      ? Number(
-          pool2.prices[`${pool2.token0.symbol}_PER_${pool2.token1.symbol}`]
-        )
-      : Number(
-          pool2.prices[`${pool2.token1.symbol}_PER_${pool2.token0.symbol}`]
-        );
-
     const isPool3Token0Dest = pool3.token0.address === destToken;
-    const rate3 = isPool3Token0Dest
-      ? Number(
-          pool3.prices[`${pool3.token0.symbol}_PER_${pool3.token1.symbol}`]
-        )
-      : Number(
-          pool3.prices[`${pool3.token1.symbol}_PER_${pool3.token0.symbol}`]
-        );
 
     // Initialize test results array
     const testResults = [];
-    let bestAmount = 1;
-    let bestProfitPercent = 0;
+    let bestAmount = 0; // Initialize to 0 (no profitable amount)
+    let bestProfitPercent = -Infinity; // Start with negative infinity to capture any profitable trade
     let bestProfit = 0;
     let bestNetProfit = 0;
+    let hasAnyProfitableAmount = false; // Flag to track if any amount is profitable
+    let bestGasCost = 0;
+
+    // Create reserves object for local calculation
+    const reserves: {
+      [poolAddress: string]: {reserve0: string; reserve1: string};
+    } = {
+      [pool1.address]: {
+        reserve0: pool1.token0.reserve,
+        reserve1: pool1.token1.reserve,
+      },
+      [pool2.address]: {
+        reserve0: pool2.token0.reserve,
+        reserve1: pool2.token1.reserve,
+      },
+      [pool3.address]: {
+        reserve0: pool3.token0.reserve,
+        reserve1: pool3.token1.reserve,
+      },
+    };
+
+    // Helper function to find pool for a pair
+    const findPoolForPair = (tokenA: string, tokenB: string): string => {
+      if (
+        (tokenA === startToken && tokenB === midToken) ||
+        (tokenA === midToken && tokenB === startToken)
+      ) {
+        return pool1.address;
+      } else if (
+        (tokenA === midToken && tokenB === destToken) ||
+        (tokenA === destToken && tokenB === midToken)
+      ) {
+        return pool2.address;
+      } else if (
+        (tokenA === destToken && tokenB === startToken) ||
+        (tokenA === startToken && tokenB === destToken)
+      ) {
+        return pool3.address;
+      }
+      return "";
+    };
+
+    // Helper function to determine if a token is token0 in a pool
+    const isToken0 = (token: string, poolAddress: string): boolean => {
+      if (poolAddress === pool1.address) {
+        return token === pool1.token0.address;
+      } else if (poolAddress === pool2.address) {
+        return token === pool2.token0.address;
+      } else if (poolAddress === pool3.address) {
+        return token === pool3.token0.address;
+      }
+      return false;
+    };
+
+    const tradePath = [startToken, midToken, destToken, startToken];
 
     // Test each amount
     for (const amount of config.TEST_AMOUNTS) {
-      // Calculate expected output for this amount
-      const midAmount = amount * rate1;
-      const destAmount = midAmount * rate2;
-      const endAmount = destAmount * rate3;
+      try {
+        // HYBRID APPROACH: First check with local calculation if it's worth pursuing
+        const localEstimate = calculateLocalTradeOutput(
+          amount,
+          tradePath,
+          reserves,
+          findPoolForPair,
+          isToken0
+        );
+        const flashLoanFee = amount * 0.003;
+        const amountToRepay = amount + flashLoanFee;
+        const estimatedProfit = localEstimate - amountToRepay;
+        const estimatedProfitPercent = estimatedProfit / amount;
 
-      // Calculate flash loan fee and profit
-      const flashLoanFee = amount * 0.003; // 0.3% fee
-      const amountToRepay = amount + flashLoanFee;
-      const profit = endAmount - amountToRepay;
-      const profitPercent = profit / amount;
+        // Only do on-chain simulation if local calculation shows potentially significant profit
+        if (estimatedProfitPercent > config.MIN_PROFIT_THRESHOLD) {
+          const endAmount = await getActualTradeOutput(amount, tradePath);
 
-      // Calculate gas cost (existing gas estimation code)
-      const estimatedGasUsed = 300000;
-      const gasCostBNB = estimatedGasUsed * config.GAS_PRICE * 1e-9;
+          // Calculate flash loan fee and profit
+          const profit = endAmount - amountToRepay;
+          const profitPercent = profit / amount;
 
-      // Convert gas cost to startToken (existing conversion code)
-      let gasCostInStartToken = 0;
-      if (
-        startToken.toLowerCase() === config.PRIORITY_TOKENS.WBNB.toLowerCase()
-      ) {
-        gasCostInStartToken = gasCostBNB;
-      } else {
-        // Find WBNB-startToken pool (existing code)
-        const bnbPools =
-          config.state.tokenPools.get(
-            config.PRIORITY_TOKENS.WBNB.toLowerCase()
-          ) || new Set();
+          // Calculate gas cost
+          // Calculate gas cost
+          const estimatedGasUsed = 300000; // Flash loan arbitrage typically uses ~300k gas
+          const gasCostBNB = estimatedGasUsed * config.GAS_PRICE * 1e-9; // Convert to BNB
 
-        for (const bnbPoolAddr of bnbPools) {
-          const bnbPool = config.state.poolsMap.get(bnbPoolAddr);
-          if (!bnbPool) continue;
+          // Convert gas cost to startToken
+          let gasCostInStartToken = 0;
 
+          // If the starting token is BNB/WBNB, use the gas cost directly
           if (
-            bnbPool.token0.address === startToken ||
-            bnbPool.token1.address === startToken
+            startToken.toLowerCase() ===
+            config.PRIORITY_TOKENS.WBNB.toLowerCase()
           ) {
-            // Found a relevant pool
-            const bnbToStartRate =
-              bnbPool.token0.address ===
-              config.PRIORITY_TOKENS.WBNB.toLowerCase()
-                ? Number(
-                    bnbPool.prices[
-                      `${bnbPool.token0.symbol}_PER_${bnbPool.token1.symbol}`
-                    ]
-                  )
-                : Number(
-                    bnbPool.prices[
-                      `${bnbPool.token1.symbol}_PER_${bnbPool.token0.symbol}`
-                    ]
-                  );
+            gasCostInStartToken = gasCostBNB;
+          } else {
+            // Find WBNB-startToken pool to get price conversion rate
+            const bnbPools =
+              config.state.tokenPools.get(
+                config.PRIORITY_TOKENS.WBNB.toLowerCase()
+              ) || new Set();
 
-            gasCostInStartToken = gasCostBNB * bnbToStartRate;
-            break;
+            // Look for a pool that contains both WBNB and our starting token
+            for (const bnbPoolAddr of bnbPools) {
+              const bnbPool = config.state.poolsMap.get(bnbPoolAddr);
+              if (!bnbPool) continue;
+
+              // Check if this pool contains our starting token
+              if (
+                bnbPool.token0.address.toLowerCase() ===
+                  startToken.toLowerCase() ||
+                bnbPool.token1.address.toLowerCase() ===
+                  startToken.toLowerCase()
+              ) {
+                // Determine BNB to startToken conversion rate
+                if (
+                  bnbPool.token0.address.toLowerCase() ===
+                  config.PRIORITY_TOKENS.WBNB.toLowerCase()
+                ) {
+                  // BNB is token0, startToken is token1
+                  // Use reserve ratio: token1Reserve / token0Reserve gives us startToken per BNB
+                  const conversionRate =
+                    Number(bnbPool.token1.reserve) /
+                    Number(bnbPool.token0.reserve);
+                  gasCostInStartToken = gasCostBNB * conversionRate;
+                } else {
+                  // BNB is token1, startToken is token0
+                  // Use reserve ratio: token0Reserve / token1Reserve gives us startToken per BNB
+                  const conversionRate =
+                    Number(bnbPool.token0.reserve) /
+                    Number(bnbPool.token1.reserve);
+                  gasCostInStartToken = gasCostBNB * conversionRate;
+                }
+                break; // Found a pool, we can stop searching
+              }
+            }
+
+            // If we couldn't find a direct BNB-startToken pool, use a default estimate
+            if (gasCostInStartToken === 0) {
+              // Assume BNB is worth ~$300 and most tokens are roughly $1 each (for stablecoins)
+              // This is a very rough fallback estimate when we can't find a direct rate
+              gasCostInStartToken = gasCostBNB * 300;
+
+              // Log that we're using an estimate
+              console.log(
+                `Warning: Could not find BNB-${startToken} pool for gas cost calculation. Using estimate.`
+              );
+            }
           }
+
+          // Calculate net profit after gas costs
+          const netProfit = profit - gasCostInStartToken;
+
+          // Save results for this test amount
+          testResults.push({
+            amount,
+            profit,
+            profitPercent,
+            netProfit,
+            endAmount, // Direct value rather than nested
+            localEstimate: {
+              endAmount: localEstimate,
+              profit: estimatedProfit,
+              profitPercent: estimatedProfitPercent,
+            },
+          });
+
+          // Update best amount ONLY if this profit is positive and better than previous best
+          if (
+            profitPercent > 0 &&
+            profitPercent > bestProfitPercent &&
+            netProfit > 0
+          ) {
+            bestProfitPercent = profitPercent;
+            bestAmount = amount;
+            bestProfit = profit;
+            bestNetProfit = netProfit;
+            bestGasCost = gasCostInStartToken;
+            hasAnyProfitableAmount = true; // We found at least one profitable amount
+          }
+        } else {
+          // Not worth checking on-chain - add the local calculation result
+          testResults.push({
+            amount,
+            profit: estimatedProfit,
+            profitPercent: estimatedProfitPercent,
+            netProfit: estimatedProfit,
+            endAmount: localEstimate, // Direct value rather than nested
+            localEstimate: {
+              endAmount: localEstimate,
+              profit: estimatedProfit,
+              profitPercent: estimatedProfitPercent,
+            },
+            skippedOnChain: true,
+          });
         }
-      }
-
-      // Calculate net profit
-      const netProfit = profit - gasCostInStartToken;
-
-      // Save results for this test amount
-      testResults.push({
-        amount,
-        profit,
-        profitPercent,
-        netProfit,
-        expected: {
-          midAmount,
-          destAmount,
-          endAmount,
-        },
-      });
-
-      // Update best amount if this profit percentage is higher
-      if (profitPercent > bestProfitPercent && netProfit > 0) {
-        bestProfitPercent = profitPercent;
-        bestAmount = amount;
-        bestProfit = profit;
-        bestNetProfit = netProfit;
+      } catch (err: unknown) {
+        // [Error handling remains the same]
       }
     }
 
-    // Check if any amount is profitable (use original 1-unit calculation for filtering)
-    const startAmount = 1;
-    const midAmount = startAmount * rate1;
-    const destAmount = midAmount * rate2;
-    const endAmount = destAmount * rate3;
-    const flashLoanFee = startAmount * 0.003;
-    const amountToRepay = startAmount + flashLoanFee;
-    const profit = endAmount - amountToRepay;
-    const profitPercent = profit / startAmount;
-
-    // Only create opportunity if meets threshold
-    if (
-      profitPercent > (config.INPUT_ARGS.percent ?? config.MIN_PROFIT_THRESHOLD)
-    ) {
-      // Calculate gas cost (use existing code for 1 unit)
-      const estimatedGasUsed = 300000;
-      const gasCostBNB = estimatedGasUsed * config.GAS_PRICE * 1e-9;
-      let gasCostInStartToken = 0;
-
-      // [Your existing gas cost conversion code here]
-
+    if (hasAnyProfitableAmount) {
       // Create and return the opportunity object with test results
       return {
         startToken,
@@ -313,10 +493,10 @@ export function calculateTriangularArbitrage(
               : pool3.token0.symbol,
           },
         ],
-        expectedProfit: profit,
-        profitPercent: profitPercent,
-        estimatedGasCost: gasCostInStartToken,
-        netProfit: profit - gasCostInStartToken,
+        expectedProfit: bestProfit,
+        profitPercent: bestProfitPercent,
+        estimatedGasCost: bestGasCost,
+        netProfit: bestNetProfit,
         timestamp: new Date().toISOString(),
         testAmounts: config.TEST_AMOUNTS,
         testResults: testResults,
@@ -325,7 +505,8 @@ export function calculateTriangularArbitrage(
     }
 
     return null;
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err as Error;
     console.log(`Error calculating arbitrage: ${error}`);
     return null;
   }

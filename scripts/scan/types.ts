@@ -33,23 +33,28 @@ export interface ArbitragePathStep {
 export interface ArbitrageOpportunity {
   startToken: string;
   path: ArbitragePathStep[];
-  expectedProfit: number;
-  profitPercent: number;
-  estimatedGasCost: number;
-  netProfit: number;
+  expectedProfit: number; // Best profit from all test amounts
+  profitPercent: number; // Profit percentage of best amount
+  estimatedGasCost: number; // Direct gas cost value
+  netProfit: number; // Profit after gas costs
   timestamp: string;
-  // fields for test amounts
-  testAmounts?: number[];
-  testResults?: {
-    amount: number;
+  testAmounts: number[]; // All amounts tested
+  testResults: TestResult[]; // Results for each test amount
+  bestAmount: number; // The amount that yielded the best profit
+}
+
+export interface TestResult {
+  amount: number; // Test amount
+  profit: number; // Raw profit (before gas)
+  profitPercent: number; // Profit as percentage
+  netProfit: number; // Profit after gas costs
+  endAmount: number; // Final amount after all swaps
+  localEstimate?: {
+    // Optional local calculation results
+    endAmount: number;
     profit: number;
     profitPercent: number;
-    netProfit: number;
-    expected: {
-      midAmount: number;
-      destAmount: number;
-      endAmount: number;
-    };
-  }[];
-  bestAmount: number; // Optimal amount with highest profit percentage
+  };
+  skippedOnChain?: boolean; // Whether on-chain verification was skipped
+  error?: string; // Optional error information
 }

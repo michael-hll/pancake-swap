@@ -2,12 +2,8 @@ import * as scannerOps from "./monitor";
 import {INPUT_ARGS, MIN_PROFIT_THRESHOLD, POOLS_TO_SAMPLE} from "./config";
 
 async function main() {
-  if (process.env.percent) {
-    INPUT_ARGS.percent = Number.parseFloat(process.env.percent);
-  }
-  if (process.env.pools) {
-    INPUT_ARGS.pools = Number.parseInt(process.env.pools);
-  }
+  parseArgs();
+
   console.log("Starting PancakeSwap V2 Arbitrage Scanner...");
   console.log(
     `Using ${
@@ -22,6 +18,15 @@ async function main() {
 
   // Start the monitoring
   await scannerOps.startMonitoring();
+}
+
+function parseArgs() {
+  if (process.env.percent) {
+    INPUT_ARGS.percent = Number.parseFloat(process.env.percent);
+  }
+  if (process.env.pools) {
+    INPUT_ARGS.pools = Number.parseInt(process.env.pools);
+  }
 }
 
 // Execute the script

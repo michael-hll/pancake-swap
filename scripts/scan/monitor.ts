@@ -66,7 +66,9 @@ export async function loadInitialPoolData() {
 
     // Short delay between batches
     if (i + config.BATCH_SIZE < config.state.currentPoolIndices.length) {
-      await new Promise((resolve) => setTimeout(resolve, config.SHORT_DELAY));
+      await new Promise((resolve) =>
+        setTimeout(resolve, config.BATCH_SHORT_DELAY)
+      );
     }
   }
 
@@ -114,11 +116,11 @@ export async function startMonitoring() {
         await Promise.all(batch);
 
         // Find opportunities after each batch refresh
-        const opportunities = arbitrageUtils.findArbitrageOpportunities();
+        const opportunities = await arbitrageUtils.findArbitrageOpportunities();
 
         // Log profitable opportunities
         if (opportunities.length > 0) {
-          displayOpportunity(opportunities, 5); // Show up to 5 opportunities
+          displayAndSaveOpportunity(opportunities, 5); // Show up to 5 opportunities
         } else {
           console.log(
             "No profitable arbitrage opportunities found in this scan."
@@ -128,7 +130,7 @@ export async function startMonitoring() {
         // Short delay between batches
         if (i + config.BATCH_SIZE < pools.length) {
           await new Promise((resolve) =>
-            setTimeout(resolve, config.SHORT_DELAY)
+            setTimeout(resolve, config.BATCH_SHORT_DELAY)
           );
         }
       }
@@ -158,10 +160,10 @@ export async function startMonitoring() {
       }
 
       // Check for opportunities after refreshing priority pools
-      const opportunities = arbitrageUtils.findArbitrageOpportunities();
+      const opportunities = await arbitrageUtils.findArbitrageOpportunities();
 
       if (opportunities.length > 0) {
-        displayOpportunity(opportunities, 5); // Show up to 5 opportunities
+        displayAndSaveOpportunity(opportunities, 5); // Show up to 5 opportunities
       } else {
         console.log(
           "No profitable arbitrage opportunities found in this scan."
@@ -178,7 +180,7 @@ export async function startMonitoring() {
  * @param opportunities List of arbitrage opportunities to display
  * @param limit Maximum number of opportunities to display
  */
-export function displayOpportunity(
+export function displayAndSaveOpportunity(
   opportunities: ArbitrageOpportunity[],
   limit: number = 3
 ) {
@@ -194,34 +196,44 @@ export function displayOpportunity(
   opportunities.slice(0, limit).forEach((opp, i) => {
     console.log(
       `   #${i + 1}: ${opp.path[0].tokenInSymbol} → ${
-        opp.path[1].tokenOutSymbol
-      } → ${opp.path[2].tokenOutSymbol}: ${(opp.profitPercent * 100).toFixed(
-        4
-      )}%`
+        opp.path[0].tokenOutSymbol
+      } → ${opp.path[1].tokenOutSymbol} → ${opp.path[2].tokenOutSymbol}: ${(
+        opp.profitPercent * 100
+      ).toFixed(4)}%`
     );
 
     // Check if enhanced test data is available
-    if (opp.testResults && opp.bestAmount) {
-      // Add information about best test amount
-      const bestTestResult = opp.testResults.find(
-        (t) => t.amount === opp.bestAmount
-      );
-      if (bestTestResult) {
-        console.log(
-          `   Best Amount: ${opp.bestAmount} ${opp.path[0].tokenInSymbol} (${(
-            bestTestResult.profitPercent * 100
-          ).toFixed(4)}%)`
+    if (opp.testResults) {
+      if (opp.bestAmount && opp.bestAmount > 0) {
+        // We have a profitable test amount
+        const bestTestResult = opp.testResults.find(
+          (t) => t.amount === opp.bestAmount
         );
-
-        console.log(`   Test Results:`);
-        opp.testResults.forEach((result) => {
+        if (bestTestResult) {
           console.log(
-            `     ${result.amount} ${opp.path[0].tokenInSymbol}: ${(
-              result.profitPercent * 100
-            ).toFixed(4)}% (${result.profit.toFixed(6)} profit)`
+            `   Best Amount: ${opp.bestAmount} ${opp.path[0].tokenInSymbol} (${(
+              bestTestResult.profitPercent * 100
+            ).toFixed(4)}%)`
           );
-        });
+        }
+      } else {
+        // No profitable test amount found
+        console.log(
+          `   Warning: No profitable test amount found at current prices`
+        );
       }
+
+      // Always show test results
+      console.log(`   Test Results:`);
+      opp.testResults.forEach((result) => {
+        // Show error information if available
+        const errorInfo = result.error ? ` (${result.error})` : "";
+        console.log(
+          `     ${result.amount} ${opp.path[0].tokenInSymbol}: ${(
+            result.profitPercent * 100
+          ).toFixed(4)}% (${result.profit.toFixed(6)} profit)${errorInfo}`
+        );
+      });
     } else {
       // Display basic profit information for legacy opportunities
       console.log(

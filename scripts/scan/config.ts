@@ -6,10 +6,10 @@ export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;
 
-// Timing parameters (seconds)
-export const SHORT_DELAY = 1000 * 5;
-export const FULL_REFRESH_INTERVAL = 1000 * 60; // 1 minute
-export const PRIORITY_REFRESH_INTERVAL = 1000 * 10; // 10 seconds
+// Timing parameters (ms)
+export const BATCH_SHORT_DELAY = 1000 * 5;
+export const FULL_REFRESH_INTERVAL = 1000 * 60;
+export const PRIORITY_REFRESH_INTERVAL = 1000 * 10;
 export const RESET_INTERVAL = 1000 * 60 * 30;
 
 // Random pool selection parameters
@@ -19,11 +19,11 @@ export let RANDOM_END = 10000; // Maximum pool index to consider (adjustable)
 export const BATCH_SIZE = 10;
 
 // Profit thresholds
-export const MIN_PROFIT_THRESHOLD = 0.005;
+export const MIN_PROFIT_THRESHOLD = 0.01;
 export const MIN_LIQUIDITY_USD = 50000;
 
 // Add this with your other constants
-export const TEST_AMOUNTS = [10, 100, 1000, 10000];
+export const TEST_AMOUNTS = [1000, 10000];
 export const INPUT_ARGS: InputsArgs = {};
 
 // ABIs
