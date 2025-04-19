@@ -2,6 +2,7 @@
 import {ethers} from "hardhat";
 import {Contract} from "ethers";
 import * as readline from "readline";
+import {PRIORITY_TOKENS} from "./scan/config";
 
 // Interfaces we need to interact with
 const IUniswapV2Factory = [
@@ -122,7 +123,7 @@ async function main() {
     );
 
     // Display token reference
-    displayTokenReference();
+    displayTokenReference(chainId);
 
     // Get tokens and amount from user input
     const token0 = await askQuestion(rl, "Enter token to borrow: ");
@@ -525,13 +526,36 @@ async function askQuestion(
 }
 
 // Display token references
-function displayTokenReference() {
+function displayTokenReference(chainId: bigint) {
   console.log("----------------------------------------------------");
-  console.log("Popular BSC Testnet Tokens:");
-  console.log(`BUSD: ${TESTNET_TOKENS.BUSD}`);
-  console.log(`CAKE: ${TESTNET_TOKENS.CAKE}`);
-  console.log(`USDT: ${TESTNET_TOKENS.USDT}`);
-  console.log(`WBNB: ${TESTNET_TOKENS.WBNB}`);
+
+  // Check which network we're on
+  if (chainId === 97n) {
+    // BSC Testnet
+    console.log("Popular BSC Testnet Tokens:");
+    console.log(`BUSD: ${TESTNET_TOKENS.BUSD}`);
+    console.log(`CAKE: ${TESTNET_TOKENS.CAKE}`);
+    console.log(`USDT: ${TESTNET_TOKENS.USDT}`);
+    console.log(`WBNB: ${TESTNET_TOKENS.WBNB}`);
+  } else if (chainId === 56n) {
+    // BSC Mainnet
+    console.log("Popular BSC Mainnet Tokens:");
+    console.log(`WBNB:  ${PRIORITY_TOKENS.WBNB}`);
+    console.log(`BUSD:  ${PRIORITY_TOKENS.BUSD}`);
+    console.log(`USDT:  ${PRIORITY_TOKENS.USDT}`);
+    console.log(`CAKE:  ${PRIORITY_TOKENS.CAKE}`);
+    console.log(`ETH:   ${PRIORITY_TOKENS.ETH}`);
+    console.log(`BTCB:  ${PRIORITY_TOKENS.BTCB}`);
+    console.log(`USDC:  ${PRIORITY_TOKENS.USDC}`);
+
+    console.log("\nAdditional High-Liquidity Tokens:");
+    console.log(`DOT:   ${PRIORITY_TOKENS.DOT}`);
+    console.log(`ADA:   ${PRIORITY_TOKENS.ADA}`);
+    console.log(`DOGE:  ${PRIORITY_TOKENS.DOGE}`);
+    console.log(`XRP:   ${PRIORITY_TOKENS.XRP}`);
+    console.log(`MATIC: ${PRIORITY_TOKENS.MATIC}`);
+    console.log(`LINK:  ${PRIORITY_TOKENS.LINK}`);
+  }
   console.log("----------------------------------------------------");
 }
 
