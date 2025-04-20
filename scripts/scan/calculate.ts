@@ -106,6 +106,7 @@ function calculateLocalTradeOutput(
   debugLog(
     "\n==== \
     \nLocal trade output:\n",
+    2,
     `Amount in: ${amount}, Amount out: ${currentAmount}, \npath: ${path.join(
       " -> "
     )}, \nreserves: ${JSON.stringify(reserves)}
@@ -251,6 +252,7 @@ export async function calculateTriangularArbitrage(
     debugLog(
       "\n========================================== \
       \nmethod calculateTriangularArbitrage enter:\n",
+      2,
       `Start token: ${startToken}, Mid token: ${midToken}, Dest token: ${destToken}`
     );
     // Determine exact path and rates
@@ -336,6 +338,14 @@ export async function calculateTriangularArbitrage(
         const amountToRepay = amount + flashLoanFee;
         const estimatedProfit = localEstimate - amountToRepay;
         const estimatedProfitPercent = estimatedProfit / amount;
+
+        if (estimatedProfitPercent > 0) {
+          debugLog(
+            `Amount: ${amount}, Local estimate: ${localEstimate},tradePath: ${tradePath}, reserves: ${JSON.stringify(
+              reserves
+            )}`
+          );
+        }
 
         // Only do on-chain simulation if local calculation shows potentially significant profit
         // estimatedProfitPercent already the fees included:
@@ -477,6 +487,7 @@ export async function calculateTriangularArbitrage(
 
     debugLog(
       "After testing all amounts: \n",
+      2,
       `$$$: Best amount: ${bestAmount}, Best profit percent: ${bestProfitPercent}, Best profit: ${bestProfit}, Best net profit: ${bestNetProfit}, Best gas cost: ${bestGasCost} \n
 Test results: ${JSON.stringify(testResults, null, 2)}\n
 --------------------------------------------------------`

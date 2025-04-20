@@ -2,11 +2,14 @@ import {ethers} from "hardhat";
 import {InputsArgs} from "./types";
 
 export const DEBUG = true;
+export const DEBUG_LEVEL = 1; // 0: no debug, 1: basic debug, 2: detailed debug
 export const DEBUG_TO_FILE = true;
 export const DEBUG_DISABLE_PRIORITY = false;
 export const DEBUG_DISABLE_RANDOM_POOLS = false;
+export const DEBUG_DELETE_LOG_FILE = true;
 
 // Constants
+export const TEST_AMOUNTS = [100, 1000, 10000];
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;
@@ -15,7 +18,7 @@ export const MAX_PROFIT_HISTORY_ITEMS = 100;
 export const BATCH_SHORT_DELAY = 1000 * 10;
 export const FULL_REFRESH_INTERVAL = 1000 * 60;
 export const PRIORITY_REFRESH_INTERVAL = 1000 * 15;
-export const RESET_INTERVAL = 1000 * 60 * 20;
+export const RESET_INTERVAL = 1000 * 60 * 15;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
@@ -27,8 +30,6 @@ export const BATCH_SIZE = 10;
 export const MIN_PROFIT_THRESHOLD = 0.01;
 export const MIN_LIQUIDITY_USD = 50000;
 
-// Add this with your other constants
-export const TEST_AMOUNTS = [0.1, 0.01];
 export const INPUT_ARGS: InputsArgs = {};
 
 // ABIs

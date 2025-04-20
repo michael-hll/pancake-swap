@@ -3,6 +3,7 @@ import * as poolUtils from "./utils-pool";
 import * as arbitrageUtils from "./calculate";
 import * as fileUtils from "./utils-file";
 import {ArbitrageOpportunity} from "./types";
+import {deleteDebugLogFile} from "./utils-log";
 
 let scanPaused = false;
 
@@ -114,6 +115,7 @@ export async function loadInitialPoolData() {
 // Real-time monitoring loop
 export async function startMonitoring() {
   console.log("Starting real-time arbitrage monitoring...");
+  deleteDebugLogFile();
 
   // Initial scan
   await loadInitialPoolData();

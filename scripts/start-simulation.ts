@@ -549,12 +549,12 @@ function displayTokenReference(chainId: bigint) {
     console.log(`USDC:  ${PRIORITY_TOKENS_MUTABLE.USDC}`);
 
     console.log("\nAdditional High-Liquidity Tokens:");
-    console.log(`DOT:   ${PRIORITY_TOKENS_MUTABLE.DOT}`);
-    console.log(`ADA:   ${PRIORITY_TOKENS_MUTABLE.ADA}`);
+    //console.log(`DOT:   ${PRIORITY_TOKENS_MUTABLE.DOT}`);
+    //console.log(`ADA:   ${PRIORITY_TOKENS_MUTABLE.ADA}`);
     console.log(`DOGE:  ${PRIORITY_TOKENS_MUTABLE.DOGE}`);
-    console.log(`XRP:   ${PRIORITY_TOKENS_MUTABLE.XRP}`);
-    console.log(`MATIC: ${PRIORITY_TOKENS_MUTABLE.MATIC}`);
-    console.log(`LINK:  ${PRIORITY_TOKENS_MUTABLE.LINK}`);
+    //console.log(`XRP:   ${PRIORITY_TOKENS_MUTABLE.XRP}`);
+    //console.log(`MATIC: ${PRIORITY_TOKENS_MUTABLE.MATIC}`);
+    //console.log(`LINK:  ${PRIORITY_TOKENS_MUTABLE.LINK}`);
   }
   console.log("----------------------------------------------------");
 }
