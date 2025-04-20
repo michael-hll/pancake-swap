@@ -1,6 +1,7 @@
 export interface InputsArgs {
   percent?: number;
   pools?: number;
+  full_refresh_interval?: number;
 }
 
 export interface TokenInfo {

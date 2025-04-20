@@ -2,7 +2,8 @@ import {ethers} from "hardhat";
 import {Contract} from "ethers";
 import {ArbitrageOpportunity, PoolData} from "./types";
 import * as config from "./config";
-import {saveLocalEstimatesForAnalysis} from "./file-utils";
+import {saveLocalEstimatesForAnalysis} from "./utils-file";
+import {debugLog} from "./utils-log";
 
 // Remove the factory import and use PancakeSwap ABI directly:
 const ROUTER_ABI = [
@@ -60,6 +61,7 @@ async function getActualTradeOutput(
   }
 }
 
+// Local Trade Calculation
 function calculateLocalTradeOutput(
   amount: number,
   path: string[],
@@ -101,6 +103,14 @@ function calculateLocalTradeOutput(
     }
   }
 
+  debugLog(
+    "\n==== \
+    \nLocal trade output:\n",
+    `Amount in: ${amount}, Amount out: ${currentAmount}, \npath: ${path.join(
+      " -> "
+    )}, \nreserves: ${JSON.stringify(reserves)}
+    \nLocal trade calculation completed\n----\n`
+  );
   return currentAmount;
 }
 
@@ -238,6 +248,11 @@ export async function calculateTriangularArbitrage(
   pool3: PoolData
 ): Promise<ArbitrageOpportunity | null> {
   try {
+    debugLog(
+      "\n========================================== \
+      \nmethod calculateTriangularArbitrage enter:\n",
+      `Start token: ${startToken}, Mid token: ${midToken}, Dest token: ${destToken}`
+    );
     // Determine exact path and rates
     const isPool1Token0Start = pool1.token0.address === startToken;
     const isPool2Token0Mid = pool2.token0.address === midToken;
@@ -323,6 +338,15 @@ export async function calculateTriangularArbitrage(
         const estimatedProfitPercent = estimatedProfit / amount;
 
         // Only do on-chain simulation if local calculation shows potentially significant profit
+        // estimatedProfitPercent already the fees included:
+        // - swap fees: 0.3% * 3 = 1.2%
+        // - flash loan fee: 0.3%
+        // - total: 1.5%
+        // So we need the MIN_PROFIT_THRESHOLD can cover the fees:
+        // - gas fees + slippage
+        // 1. For computational efficiency only: 0.5-0.8% could be sufficient
+        // 2. For slippage protection: 1.0-1.5% is reasonable
+        // 3. For higher execution success rate: 1.5-2.0% provides more safety
         if (estimatedProfitPercent > config.MIN_PROFIT_THRESHOLD) {
           localEstimatedProfit = true;
           const endAmount = await getActualTradeOutput(amount, tradePath);
@@ -342,14 +366,14 @@ export async function calculateTriangularArbitrage(
           // If the starting token is BNB/WBNB, use the gas cost directly
           if (
             startToken.toLowerCase() ===
-            config.PRIORITY_TOKENS.WBNB.toLowerCase()
+            config.PRIORITY_TOKENS_MUTABLE.WBNB.toLowerCase()
           ) {
             gasCostInStartToken = gasCostBNB;
           } else {
             // Find WBNB-startToken pool to get price conversion rate
             const bnbPools =
               config.state.tokenPools.get(
-                config.PRIORITY_TOKENS.WBNB.toLowerCase()
+                config.PRIORITY_TOKENS_MUTABLE.WBNB.toLowerCase()
               ) || new Set();
 
             // Look for a pool that contains both WBNB and our starting token
@@ -367,7 +391,7 @@ export async function calculateTriangularArbitrage(
                 // Determine BNB to startToken conversion rate
                 if (
                   bnbPool.token0.address.toLowerCase() ===
-                  config.PRIORITY_TOKENS.WBNB.toLowerCase()
+                  config.PRIORITY_TOKENS_MUTABLE.WBNB.toLowerCase()
                 ) {
                   // BNB is token0, startToken is token1
                   // Use reserve ratio: token1Reserve / token0Reserve gives us startToken per BNB
@@ -450,6 +474,13 @@ export async function calculateTriangularArbitrage(
         // [Error handling remains the same]
       }
     }
+
+    debugLog(
+      "After testing all amounts: \n",
+      `$$$: Best amount: ${bestAmount}, Best profit percent: ${bestProfitPercent}, Best profit: ${bestProfit}, Best net profit: ${bestNetProfit}, Best gas cost: ${bestGasCost} \n
+Test results: ${JSON.stringify(testResults, null, 2)}\n
+--------------------------------------------------------`
+    );
 
     if (hasAnyProfitableAmount) {
       // Create and return the opportunity object with test results

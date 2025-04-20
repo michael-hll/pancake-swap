@@ -1,5 +1,10 @@
 import * as scannerOps from "./monitor";
-import {INPUT_ARGS, MIN_PROFIT_THRESHOLD, POOLS_TO_SAMPLE} from "./config";
+import {
+  INPUT_ARGS,
+  MIN_PROFIT_THRESHOLD,
+  POOLS_TO_SAMPLE,
+  FULL_REFRESH_INTERVAL,
+} from "./config";
 
 async function main() {
   parseArgs();
@@ -15,6 +20,11 @@ async function main() {
       INPUT_ARGS.pools ?? POOLS_TO_SAMPLE
     } as the number of pools to sample`
   );
+  console.log(
+    `Using ${
+      INPUT_ARGS.full_refresh_interval ?? FULL_REFRESH_INTERVAL
+    } ms as the full refresh interval`
+  );
 
   // Start the monitoring
   await scannerOps.startMonitoring();
@@ -26,6 +36,11 @@ function parseArgs() {
   }
   if (process.env.pools) {
     INPUT_ARGS.pools = Number.parseInt(process.env.pools);
+  }
+  if (process.env.refresh_interval) {
+    INPUT_ARGS.full_refresh_interval = Number.parseInt(
+      process.env.refresh_interval
+    );
   }
 }
 

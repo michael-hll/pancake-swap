@@ -1,74 +1,110 @@
 import * as config from "./config";
-import * as poolUtils from "./pool-utils";
+import * as poolUtils from "./utils-pool";
 import * as arbitrageUtils from "./calculate";
-import * as fileUtils from "./file-utils";
+import * as fileUtils from "./utils-file";
 import {ArbitrageOpportunity} from "./types";
+
+let scanPaused = false;
 
 // Load initial pool data for important pools
 export async function loadInitialPoolData() {
   console.log("Loading initial pool data...");
 
-  // Get total pool count first
-  const totalPoolsBigInt = await config.factory.allPairsLength();
-  const totalPoolsNumber = Number(totalPoolsBigInt);
-  config.updateTotalPools(totalPoolsNumber);
-  config.updateRandomEnd(totalPoolsNumber - 1);
-  console.log(`Found ${config.state.totalPools} total pairs on PancakeSwap V2`);
+  let success = false;
+  scanPaused = true;
 
-  // Generate initial random pool indices
-  config.state.currentPoolIndices = poolUtils.generateRandomPoolIndices(
-    config.POOLS_TO_SAMPLE,
-    config.RANDOM_START,
-    config.RANDOM_END
-  );
-
-  // Load pools for priority pairs first
-  for (const [symbol1, address1] of Object.entries(config.PRIORITY_TOKENS)) {
-    for (const [symbol2, address2] of Object.entries(config.PRIORITY_TOKENS)) {
-      if (symbol1 === symbol2) continue;
-
-      const pairAddress = await config.factory.getPair(address1, address2);
-      if (pairAddress === "0x0000000000000000000000000000000000000000")
-        continue;
-
-      try {
-        await poolUtils.loadPoolData(pairAddress, -1); // Use -1 for direct lookup pools
-        console.log(`Loaded ${symbol1}-${symbol2} pool`);
-      } catch (error) {
-        console.log(`Error loading ${symbol1}-${symbol2} pool: ${error}`);
-      }
-    }
-  }
-
-  // Load randomly selected pools in batches
-  console.log(
-    `Loading ${config.state.currentPoolIndices.length} randomly selected pools...`
-  );
-
-  for (
-    let i = 0;
-    i < config.state.currentPoolIndices.length;
-    i += config.BATCH_SIZE
-  ) {
-    const batch = [];
-    const end = Math.min(
-      i + config.BATCH_SIZE,
-      config.state.currentPoolIndices.length
-    );
-
-    console.log(`Loading batch ${i} to ${end - 1}...`);
-
-    for (let j = i; j < end; j++) {
-      batch.push(poolUtils.loadPoolByIndex(config.state.currentPoolIndices[j]));
-    }
-
-    await Promise.all(batch);
-
-    // Short delay between batches
-    if (i + config.BATCH_SIZE < config.state.currentPoolIndices.length) {
-      await new Promise((resolve) =>
-        setTimeout(resolve, config.BATCH_SHORT_DELAY)
+  while (!success) {
+    try {
+      // Get total pool count first
+      const totalPoolsBigInt = await config.factory.allPairsLength();
+      const totalPoolsNumber = Number(totalPoolsBigInt);
+      config.updateTotalPools(totalPoolsNumber);
+      config.updateRandomEnd(totalPoolsNumber - 1);
+      console.log(
+        `Found ${config.state.totalPools} total pairs on PancakeSwap V2`
       );
+
+      // Generate initial random pool indices
+      if (!config.DEBUG_DISABLE_RANDOM_POOLS) {
+        config.state.currentPoolIndices = poolUtils.generateRandomPoolIndices(
+          config.INPUT_ARGS.pools ?? config.POOLS_TO_SAMPLE,
+          config.RANDOM_START,
+          config.RANDOM_END
+        );
+      }
+
+      // Load pools for priority pairs first
+      for (const [symbol1, address1] of Object.entries(
+        config.PRIORITY_TOKENS_MUTABLE
+      )) {
+        if (config.DEBUG_DISABLE_PRIORITY) break;
+        for (const [symbol2, address2] of Object.entries(
+          config.PRIORITY_TOKENS_MUTABLE
+        )) {
+          if (symbol1 === symbol2) continue;
+
+          const pairAddress = await config.factory.getPair(address1, address2);
+          if (pairAddress === "0x0000000000000000000000000000000000000000")
+            continue;
+
+          try {
+            await poolUtils.loadPoolData(pairAddress, -1); // Use -1 for direct lookup pools
+            console.log(`Loaded ${symbol1}-${symbol2} pool`);
+          } catch (error) {
+            console.log(`Error loading ${symbol1}-${symbol2} pool: ${error}`);
+          }
+        }
+      }
+
+      // Load randomly selected pools in batches
+      if (!config.DEBUG_DISABLE_RANDOM_POOLS) {
+        console.log(
+          `Loading ${config.state.currentPoolIndices.length} randomly selected pools...`
+        );
+      }
+
+      for (
+        let i = 0;
+        i < config.state.currentPoolIndices.length;
+        i += config.BATCH_SIZE
+      ) {
+        const batch = [];
+        const end = Math.min(
+          i + config.BATCH_SIZE,
+          config.state.currentPoolIndices.length
+        );
+
+        console.log(`Loading batch ${i} to ${end - 1}...`);
+
+        for (let j = i; j < end; j++) {
+          batch.push(
+            poolUtils.loadPoolByIndex(config.state.currentPoolIndices[j])
+          );
+        }
+
+        await Promise.all(batch);
+
+        // Short delay between batches
+        if (i + config.BATCH_SIZE < config.state.currentPoolIndices.length) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, config.BATCH_SHORT_DELAY)
+          );
+        }
+      }
+
+      success = true;
+      scanPaused = false;
+    } catch (error) {
+      // pause 5 seconds and retry
+      console.error(
+        `Error loading initial pool data: ${error}. Retrying in 5 seconds...`
+      );
+      // Reset the pool selection
+      poolUtils.resetPoolSelection();
+
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+    } finally {
+      scanPaused = false;
     }
   }
 
@@ -84,6 +120,8 @@ export async function startMonitoring() {
 
   // Check if reset is needed
   setInterval(() => {
+    if (scanPaused) return; // Skip if paused
+    if (config.DEBUG) return; // Skip if debug mode
     const timeSinceLastProfit = Date.now() - config.state.lastProfitFound;
     if (timeSinceLastProfit > config.RESET_INTERVAL) {
       console.log(
@@ -100,6 +138,7 @@ export async function startMonitoring() {
   // Periodic full scans
   setInterval(async () => {
     try {
+      if (scanPaused) return; // Skip if paused
       console.log("\nPerforming periodic refresh of pool data...");
 
       // Refresh all pools in memory (in batches)
@@ -137,17 +176,19 @@ export async function startMonitoring() {
     } catch (error) {
       console.error("Error during periodic refresh:", error);
     }
-  }, config.FULL_REFRESH_INTERVAL);
+  }, config.INPUT_ARGS.full_refresh_interval ?? config.FULL_REFRESH_INTERVAL);
 
   // More frequent targeted refreshes for priority pools
   setInterval(async () => {
     try {
+      if (scanPaused) return; // Skip if paused
+      if (config.DEBUG_DISABLE_PRIORITY) return; // Skip if disabled in debug mode
       // Refresh only high priority pools
       for (const [symbol1, address1] of Object.entries(
-        config.PRIORITY_TOKENS
+        config.PRIORITY_TOKENS_MUTABLE
       )) {
         for (const [symbol2, address2] of Object.entries(
-          config.PRIORITY_TOKENS
+          config.PRIORITY_TOKENS_MUTABLE
         )) {
           if (symbol1 === symbol2) continue;
 

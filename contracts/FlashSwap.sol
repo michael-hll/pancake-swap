@@ -438,6 +438,7 @@ contract FlashSwap is ReentrancyGuard {
         path[0] = _fromToken;
         path[1] = _toToken;
 
+        // will pay 0.3% fee for the query
         uint256 expectedAmount = IUniswapV2Router01(PANCAKE_ROUTER)
             .getAmountsOut(_amountIn, path)[1];
 

@@ -2,7 +2,7 @@
 import {ethers} from "hardhat";
 import {Contract} from "ethers";
 import * as readline from "readline";
-import {PRIORITY_TOKENS} from "./scan/config";
+import {PRIORITY_TOKENS_MUTABLE} from "./scan/config";
 
 // Interfaces we need to interact with
 const IUniswapV2Factory = [
@@ -540,21 +540,21 @@ function displayTokenReference(chainId: bigint) {
   } else if (chainId === 56n) {
     // BSC Mainnet
     console.log("Popular BSC Mainnet Tokens:");
-    console.log(`WBNB:  ${PRIORITY_TOKENS.WBNB}`);
-    console.log(`BUSD:  ${PRIORITY_TOKENS.BUSD}`);
-    console.log(`USDT:  ${PRIORITY_TOKENS.USDT}`);
-    console.log(`CAKE:  ${PRIORITY_TOKENS.CAKE}`);
-    console.log(`ETH:   ${PRIORITY_TOKENS.ETH}`);
-    console.log(`BTCB:  ${PRIORITY_TOKENS.BTCB}`);
-    console.log(`USDC:  ${PRIORITY_TOKENS.USDC}`);
+    console.log(`WBNB:  ${PRIORITY_TOKENS_MUTABLE.WBNB}`);
+    console.log(`BUSD:  ${PRIORITY_TOKENS_MUTABLE.BUSD}`);
+    console.log(`USDT:  ${PRIORITY_TOKENS_MUTABLE.USDT}`);
+    console.log(`CAKE:  ${PRIORITY_TOKENS_MUTABLE.CAKE}`);
+    console.log(`ETH:   ${PRIORITY_TOKENS_MUTABLE.ETH}`);
+    console.log(`BTCB:  ${PRIORITY_TOKENS_MUTABLE.BTCB}`);
+    console.log(`USDC:  ${PRIORITY_TOKENS_MUTABLE.USDC}`);
 
     console.log("\nAdditional High-Liquidity Tokens:");
-    console.log(`DOT:   ${PRIORITY_TOKENS.DOT}`);
-    console.log(`ADA:   ${PRIORITY_TOKENS.ADA}`);
-    console.log(`DOGE:  ${PRIORITY_TOKENS.DOGE}`);
-    console.log(`XRP:   ${PRIORITY_TOKENS.XRP}`);
-    console.log(`MATIC: ${PRIORITY_TOKENS.MATIC}`);
-    console.log(`LINK:  ${PRIORITY_TOKENS.LINK}`);
+    console.log(`DOT:   ${PRIORITY_TOKENS_MUTABLE.DOT}`);
+    console.log(`ADA:   ${PRIORITY_TOKENS_MUTABLE.ADA}`);
+    console.log(`DOGE:  ${PRIORITY_TOKENS_MUTABLE.DOGE}`);
+    console.log(`XRP:   ${PRIORITY_TOKENS_MUTABLE.XRP}`);
+    console.log(`MATIC: ${PRIORITY_TOKENS_MUTABLE.MATIC}`);
+    console.log(`LINK:  ${PRIORITY_TOKENS_MUTABLE.LINK}`);
   }
   console.log("----------------------------------------------------");
 }
