@@ -6,6 +6,7 @@ import {ArbitrageOpportunity} from "./types";
 import {deleteDebugLogFile} from "./utils-log";
 
 let scanPaused = false;
+let fullScanRunning = false;
 
 // Load initial pool data for important pools
 export async function loadInitialPoolData() {
@@ -139,8 +140,9 @@ export async function startMonitoring() {
 
   // Periodic full scans
   setInterval(async () => {
+    if (scanPaused) return; // Skip if paused
+    fullScanRunning = true;
     try {
-      if (scanPaused) return; // Skip if paused
       console.log("\nPerforming periodic refresh of pool data...");
 
       // Refresh all pools in memory (in batches)
@@ -177,13 +179,15 @@ export async function startMonitoring() {
       }
     } catch (error) {
       console.error("Error during periodic refresh:", error);
+    } finally {
+      fullScanRunning = false;
     }
   }, config.INPUT_ARGS.full_refresh_interval ?? config.FULL_REFRESH_INTERVAL);
 
   // More frequent targeted refreshes for priority pools
   setInterval(async () => {
+    if (scanPaused || fullScanRunning) return; // Skip if paused
     try {
-      if (scanPaused) return; // Skip if paused
       if (config.DEBUG_DISABLE_PRIORITY) return; // Skip if disabled in debug mode
       // Refresh only high priority pools
       for (const [symbol1, address1] of Object.entries(
@@ -198,7 +202,7 @@ export async function startMonitoring() {
           if (pairAddress === "0x0000000000000000000000000000000000000000")
             continue;
 
-          await poolUtils.loadPoolData(pairAddress, -1);
+          await poolUtils.loadPoolData(pairAddress, -1, true);
         }
       }
 

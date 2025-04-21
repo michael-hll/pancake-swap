@@ -98,20 +98,26 @@ export async function loadPoolByIndex(index: number) {
 // Load data for a specific pool
 export async function loadPoolData(
   pairAddress: string,
-  index: number
+  index: number,
+  forceRefresh: boolean = false
 ): Promise<PoolData | null> {
   try {
     pairAddress = pairAddress.toLowerCase();
 
     // Skip if already loaded recently
-    if (config.state.poolsMap.has(pairAddress)) {
+    if (!forceRefresh && config.state.poolsMap.has(pairAddress)) {
       const existing = config.state.poolsMap.get(pairAddress)!;
       const lastUpdate = new Date(existing.updated);
       const now = new Date();
       const secondsSinceUpdate = (now.getTime() - lastUpdate.getTime()) / 1000;
 
+      const refreshInterval =
+        index === -1 // -1 is used for priority pairs
+          ? config.PRIORITY_REFRESH_INTERVAL / 1000 // Priority pairs refresh more frequently
+          : config.FULL_REFRESH_INTERVAL / 1000; // Regular pairs refresh less frequently
+
       // Only refresh if data is older
-      if (secondsSinceUpdate < config.FULL_REFRESH_INTERVAL / 1000) {
+      if (secondsSinceUpdate < refreshInterval) {
         return existing;
       }
     }
