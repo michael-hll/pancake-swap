@@ -11,6 +11,7 @@ let fullScanRunning = false;
 // Load initial pool data for important pools
 export async function loadInitialPoolData() {
   console.log("Loading initial pool data...");
+  const startTime = Date.now();
 
   let success = false;
   scanPaused = true;
@@ -110,7 +111,10 @@ export async function loadInitialPoolData() {
     }
   }
 
-  console.log(`Loaded ${config.state.poolsMap.size} pools into memory`);
+  const elapsedMinutes = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
+  console.log(
+    `Loaded ${config.state.poolsMap.size} pools into memory (${elapsedMinutes})`
+  );
 }
 
 // Real-time monitoring loop
@@ -185,7 +189,7 @@ export async function startMonitoring() {
 
   // More frequent targeted refreshes for priority pools
   setInterval(async () => {
-    if (scanPaused || fullScanRunning) return; // Skip if paused
+    if (scanPaused) return; // Skip if paused
     try {
       if (config.DEBUG_DISABLE_PRIORITY) return; // Skip if disabled in debug mode
       // Refresh only high priority pools
