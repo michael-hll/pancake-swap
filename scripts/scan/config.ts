@@ -6,19 +6,19 @@ export const DEBUG_LEVEL = 1; // 0: no debug, 1: basic debug, 2: detailed debug
 export const DEBUG_TO_FILE = true;
 export const DEBUG_DISABLE_PRIORITY = false;
 export const DEBUG_DISABLE_RANDOM_POOLS = false;
-export const DEBUG_DELETE_LOG_FILE = true;
+export const DEBUG_DELETE_LOG_FILE = false;
 
 // Constants
-export const TEST_AMOUNTS = [100, 1000, 10000];
+export const TEST_AMOUNTS = [1000, 10000, 100000];
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;
 
 // Timing parameters (ms)
-export const BATCH_SHORT_DELAY = 1000 * 10;
-export const FULL_REFRESH_INTERVAL = 1000 * 60;
-export const PRIORITY_REFRESH_INTERVAL = 1000 * 15;
-export const RESET_INTERVAL = 1000 * 60 * 15;
+export const BATCH_SHORT_DELAY = 1000 * 5;
+export const FULL_REFRESH_INTERVAL = 1000 * 60 * 5;
+export const PRIORITY_REFRESH_INTERVAL = 1000 * 20;
+export const RESET_INTERVAL = 1000 * 60 * 20;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample

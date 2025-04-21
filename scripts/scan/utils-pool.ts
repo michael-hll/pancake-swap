@@ -202,7 +202,7 @@ export async function loadPoolData(
 
     return poolData;
   } catch (error) {
-    console.log(`Error processing pair ${pairAddress}: ${error}`);
+    console.log(`Error processing pair ${pairAddress} (${index}): ${error}`);
     // Wait a moment before returning to avoid rapid retries on persistent errors
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return null;

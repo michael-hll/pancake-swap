@@ -122,9 +122,8 @@ export async function startMonitoring() {
   await loadInitialPoolData();
 
   // Check if reset is needed
-  setInterval(() => {
-    if (scanPaused) return; // Skip if paused
-    if (config.DEBUG) return; // Skip if debug mode
+  setInterval(async () => {
+    if (scanPaused || config.DEBUG) return; // Skip if paused or DEBUG mode is on
     const timeSinceLastProfit = Date.now() - config.state.lastProfitFound;
     if (timeSinceLastProfit > config.RESET_INTERVAL) {
       console.log(
@@ -133,7 +132,7 @@ export async function startMonitoring() {
         } minutes. Resetting pool selection.`
       );
       poolUtils.resetPoolSelection();
-      loadInitialPoolData();
+      await loadInitialPoolData();
       console.log("poolset was reset!");
     }
   }, 1000 * 60); // Check every minute
@@ -166,7 +165,7 @@ export async function startMonitoring() {
           displayAndSaveOpportunity(opportunities, 5); // Show up to 5 opportunities
         } else {
           console.log(
-            "No profitable arbitrage opportunities found in this scan."
+            "No profitable arbitrage opportunities found in this scan. (Full)"
           );
         }
 
@@ -213,7 +212,7 @@ export async function startMonitoring() {
         displayAndSaveOpportunity(opportunities, 5); // Show up to 5 opportunities
       } else {
         console.log(
-          "No profitable arbitrage opportunities found in this scan."
+          "No profitable arbitrage opportunities found in this scan. (Priority)"
         );
       }
     } catch (error) {
