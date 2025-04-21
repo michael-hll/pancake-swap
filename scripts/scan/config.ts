@@ -24,7 +24,7 @@ export const RESET_INTERVAL = 1000 * 60 * 20;
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
 export const RANDOM_START = 0; // Minimum pool index to consider
 export let RANDOM_END = 10000; // Maximum pool index to consider (adjustable)
-export const BATCH_SIZE = 10;
+export const BATCH_SIZE = 15;
 
 // Profit thresholds
 export const MIN_PROFIT_THRESHOLD = 0.01;

@@ -113,7 +113,7 @@ export async function loadInitialPoolData() {
 
   const elapsedMinutes = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
   console.log(
-    `Loaded ${config.state.poolsMap.size} pools into memory (${elapsedMinutes})`
+    `Loaded ${config.state.poolsMap.size} pools into memory (${elapsedMinutes} minutes)`
   );
 }
 
