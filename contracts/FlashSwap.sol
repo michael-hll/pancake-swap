@@ -35,9 +35,9 @@ contract FlashSwap is ReentrancyGuard {
     }
 
     // Token Addresses
-    address private TOKEN0 = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56; // BUSD
-    address private TOKEN1 = 0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82; // CAKE
-    address private TOKEN2 = 0x2c094F5A7D1146BB93850f629501eB749f6Ed491; // CROX
+    address private TOKEN0;
+    address private TOKEN1;
+    address private TOKEN2;
 
     event ArbitrageExecuted(
         address indexed tokenBorrowed,
@@ -234,6 +234,7 @@ contract FlashSwap is ReentrancyGuard {
     /// @param _token1 First token to swap to
     /// @param _token2 Second token to swap to
     /// @param _deadlineMinutes Maximum time the transaction can be pending; Value 0 will use default
+    /// @param _slippageValues Slippage values for each trade; Must be 3 values or none
     function start(
         address _token0,
         uint256 _borrow_amt,
@@ -246,14 +247,11 @@ contract FlashSwap is ReentrancyGuard {
 
         // Validate slippage array if provided
         if (_slippageValues.length > 0) {
-            require(
-                _slippageValues.length == 3,
-                "Must provide 3 slippage values or none"
-            );
+            require(_slippageValues.length == 3, "Slippage values length != 3");
             for (uint i = 0; i < _slippageValues.length; i++) {
                 require(
                     _slippageValues[i] >= 990 && _slippageValues[i] <= 999,
-                    "Slippage should be in [990,999]"
+                    "Slippage not in [990,999]"
                 );
             }
         }
