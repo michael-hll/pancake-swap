@@ -4,6 +4,7 @@ import {ArbitrageOpportunity, PoolData} from "./types";
 import * as config from "./config";
 import {saveLocalEstimatesForAnalysis} from "./utils-file";
 import {debugLog} from "./utils-log";
+import {sendArbitrage} from "./send";
 
 // Remove the factory import and use PancakeSwap ABI directly:
 const ROUTER_ABI = [
@@ -229,7 +230,7 @@ export async function findArbitrageOpportunities() {
           if (otherToken === startToken) {
             // We found a triangular path!
             // Calculate potential profit
-            const profit = await calculateTriangularArbitrage(
+            const opportunity = await calculateTriangularArbitrage(
               startToken,
               midToken,
               destToken,
@@ -239,11 +240,12 @@ export async function findArbitrageOpportunities() {
             );
 
             if (
-              profit &&
-              profit.profitPercent >
+              opportunity &&
+              opportunity.profitPercent >
                 (config.INPUT_ARGS.percent ?? config.MIN_PROFIT_THRESHOLD)
             ) {
-              opportunities.push(profit);
+              sendArbitrage(opportunity);
+              opportunities.push(opportunity);
               // Update last profit found time
               config.state.lastProfitFound = Date.now();
             }
@@ -540,6 +542,8 @@ Test results: ${JSON.stringify(testResults, null, 2)}\n
             tokenOutSymbol: isPool1Token0Start
               ? pool1.token1.symbol
               : pool1.token0.symbol,
+            tokenInDecimals: config.state.tokenCache[startToken].decimals,
+            tokenOutDecimals: config.state.tokenCache[midToken].decimals,
           },
           {
             poolAddress: pool2.address,
@@ -551,6 +555,8 @@ Test results: ${JSON.stringify(testResults, null, 2)}\n
             tokenOutSymbol: isPool2Token0Mid
               ? pool2.token1.symbol
               : pool2.token0.symbol,
+            tokenInDecimals: config.state.tokenCache[midToken].decimals,
+            tokenOutDecimals: config.state.tokenCache[destToken].decimals,
           },
           {
             poolAddress: pool3.address,
@@ -562,6 +568,8 @@ Test results: ${JSON.stringify(testResults, null, 2)}\n
             tokenOutSymbol: isPool3Token0Dest
               ? pool3.token1.symbol
               : pool3.token0.symbol,
+            tokenInDecimals: config.state.tokenCache[destToken].decimals,
+            tokenOutDecimals: config.state.tokenCache[startToken].decimals,
           },
         ],
         expectedProfit: bestProfit,

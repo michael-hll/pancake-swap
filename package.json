@@ -17,6 +17,7 @@
     "js-yaml": "^4.1.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^4.9.3"
+    "@openzeppelin/contracts": "^4.9.3",
+    "bullmq": "^5.49.2"
   }
 }

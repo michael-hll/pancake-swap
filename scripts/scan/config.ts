@@ -1,4 +1,5 @@
 import {ethers} from "hardhat";
+import {Queue} from "bullmq";
 import {InputsArgs, TokenInfo} from "./types";
 
 export const DEBUG = true;
@@ -96,6 +97,13 @@ export const factory = new ethers.Contract(
   FACTORY_ABI,
   provider
 );
+
+export const arbitrageQueue = new Queue("flash-queue", {
+  connection: {
+    host: "localhost",
+    port: 6379,
+  },
+});
 
 // State variables (these are mutable and need to be exported as objects)
 export const state = {

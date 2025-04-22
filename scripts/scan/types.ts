@@ -35,6 +35,8 @@ export interface ArbitragePathStep {
   tokenOut: string;
   tokenInSymbol: string;
   tokenOutSymbol: string;
+  tokenInDecimals: number;
+  tokenOutDecimals: number;
 }
 
 export interface ArbitrageOpportunity {
