@@ -191,8 +191,8 @@ export async function loadInitialPoolData() {
             .filter((pool) => pool && pool.liquidityUSD)
             .sort((a, b) => b.liquidityUSD - a.liquidityUSD);
 
-          // Show top 3 pairs by liquidity
-          const topPairs = poolsWithLiquidity.slice(0, 3);
+          // Show top N pairs by liquidity
+          const topPairs = poolsWithLiquidity.slice(0, 5);
           if (topPairs.length > 0) {
             console.log(`  Top pairs by liquidity:`);
             topPairs.forEach((pool) => {

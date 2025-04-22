@@ -109,6 +109,13 @@ export async function loadPoolData(
   try {
     pairAddress = pairAddress.toLowerCase();
 
+    if (config.state.poolsMap.has(pairAddress)) {
+      localToken0Info = config.state.poolsMap.get(pairAddress)!
+        .token0 as TokenInfo;
+      localToken1Info = config.state.poolsMap.get(pairAddress)!
+        .token1 as TokenInfo;
+    }
+
     // Skip if already loaded recently
     if (!forceRefresh && config.state.poolsMap.has(pairAddress)) {
       const existing = config.state.poolsMap.get(pairAddress)!;
@@ -146,8 +153,10 @@ export async function loadPoolData(
       getTokenInfo(token0),
       getTokenInfo(token1),
     ]);
-    localToken0Info = token0Info;
-    localToken1Info = token1Info;
+    if (!localToken0Info) {
+      localToken0Info = token0Info;
+      localToken1Info = token1Info;
+    }
 
     if (
       token0Info.symbol === config.UNKNOW_TOKEN_SYMBOL ||
