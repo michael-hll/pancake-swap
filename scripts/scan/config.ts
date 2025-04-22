@@ -22,6 +22,7 @@ export const RESET_INTERVAL = 1000 * 60 * 15;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
+export const POOLS_NEWLY_ADDED = 50;
 export const RANDOM_START = 0; // Minimum pool index to consider
 export let RANDOM_END = 10000; // Maximum pool index to consider (adjustable)
 export const BATCH_SIZE = 20;

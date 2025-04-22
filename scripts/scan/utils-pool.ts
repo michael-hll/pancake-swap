@@ -24,6 +24,11 @@ export function generateRandomPoolIndices(
     poolIndicesSet.add(randomIndex);
   }
 
+  // include newly added pools
+  for (let i = max; i >= max - config.POOLS_NEWLY_ADDED; i--) {
+    poolIndicesSet.add(i);
+  }
+
   return Array.from(poolIndicesSet);
 }
 
