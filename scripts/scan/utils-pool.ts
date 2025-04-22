@@ -1,5 +1,5 @@
 import {ethers} from "hardhat";
-import {PoolData} from "./types";
+import {PoolData, PoolTokenInfo, TokenInfo} from "./types";
 import * as config from "./config";
 
 // Generate unique random pool indices
@@ -35,7 +35,6 @@ export function resetPoolSelection() {
 
   // Clear existing data
   config.state.poolsMap.clear();
-  config.state.tokenPools.clear();
 
   // Generate new random indices
   config.state.currentPoolIndices = generateRandomPoolIndices(
@@ -63,8 +62,8 @@ export async function getTokenInfo(address: string) {
     );
 
     const [name, symbol, decimals] = await Promise.all([
-      token.name().catch(() => "Unknown"),
-      token.symbol().catch(() => "UNKNOWN"),
+      token.name().catch(() => config.UNKNOW_TOKEN_NAME),
+      token.symbol().catch(() => config.UNKNOW_TOKEN_SYMBOL),
       token.decimals().catch(() => 18),
     ]);
 
@@ -72,7 +71,11 @@ export async function getTokenInfo(address: string) {
     return config.state.tokenCache[address];
   } catch (error) {
     console.log(`Error fetching token info for ${address}: ${error}`);
-    return {name: "Unknown", symbol: "UNKNOWN", decimals: 18};
+    return {
+      name: config.UNKNOW_TOKEN_NAME,
+      symbol: config.UNKNOW_TOKEN_SYMBOL,
+      decimals: 18,
+    };
   }
 }
 
@@ -101,6 +104,8 @@ export async function loadPoolData(
   index: number,
   forceRefresh: boolean = false
 ): Promise<PoolData | null> {
+  let localToken0Info: TokenInfo | null = null;
+  let localToken1Info: TokenInfo | null = null;
   try {
     pairAddress = pairAddress.toLowerCase();
 
@@ -141,8 +146,13 @@ export async function loadPoolData(
       getTokenInfo(token0),
       getTokenInfo(token1),
     ]);
+    localToken0Info = token0Info;
+    localToken1Info = token1Info;
 
-    if (token0Info.symbol === "UNKNOWN" || token1Info.symbol === "UNKNOWN") {
+    if (
+      token0Info.symbol === config.UNKNOW_TOKEN_SYMBOL ||
+      token1Info.symbol === config.UNKNOW_TOKEN_SYMBOL
+    ) {
       console.log(`Skipping pool ${pairAddress} due to unknown token info`);
       return null;
     }
@@ -202,7 +212,13 @@ export async function loadPoolData(
 
     return poolData;
   } catch (error) {
-    console.log(`Error processing pair ${pairAddress} (${index}): ${error}`);
+    console.log(
+      `Error processing pair ${pairAddress} (${
+        localToken0Info ? localToken0Info.symbol : config.UNKNOW_TOKEN_SYMBOL
+      } -> ${
+        localToken1Info ? localToken1Info.symbol : config.UNKNOW_TOKEN_SYMBOL
+      }): ${error}`
+    );
     // Wait a moment before returning to avoid rapid retries on persistent errors
     await new Promise((resolve) => setTimeout(resolve, 1000));
     return null;

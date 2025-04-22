@@ -334,6 +334,13 @@ export async function calculateTriangularArbitrage(
           findPoolForPair,
           isToken0
         );
+        if (localEstimate > amount) {
+          debugLog(
+            `Test Amount: ${amount}, localEstimate: ${localEstimate}, tradePath: ${tradePath
+              .map((token) => config.state.tokenCache[token].symbol)
+              .join(" -> ")}`
+          );
+        }
         const flashLoanFee = amount * 0.003;
         const amountToRepay = amount + flashLoanFee;
         const estimatedProfit = localEstimate - amountToRepay;

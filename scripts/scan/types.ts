@@ -4,7 +4,7 @@ export interface InputsArgs {
   full_refresh_interval?: number;
 }
 
-export interface TokenInfo {
+export interface PoolTokenInfo {
   address: string;
   name: string;
   symbol: string;
@@ -12,11 +12,17 @@ export interface TokenInfo {
   reserve: string;
 }
 
+export interface TokenInfo {
+  name: string;
+  symbol: string;
+  decimals: number;
+}
+
 export interface PoolData {
   index: number;
   address: string;
-  token0: TokenInfo;
-  token1: TokenInfo;
+  token0: PoolTokenInfo;
+  token1: PoolTokenInfo;
   prices: {[key: string]: number};
   liquidityUSD: string;
   totalSupply: string;

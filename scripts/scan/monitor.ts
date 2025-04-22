@@ -8,6 +8,17 @@ import {deleteDebugLogFile} from "./utils-log";
 let scanPaused = false;
 let fullScanRunning = false;
 
+interface PriorityPair {
+  symbol1: string;
+  symbol2: string;
+  address1: string;
+  address2: string;
+}
+
+interface BatchPair extends PriorityPair {
+  pairAddress: string;
+}
+
 // Load initial pool data for important pools
 export async function loadInitialPoolData() {
   console.log("Loading initial pool data...");
@@ -35,63 +46,168 @@ export async function loadInitialPoolData() {
           config.RANDOM_END
         );
       }
+      // ---------------- PRIORITY POOLS LOADING -----------------
+      // Load pools for priority pairs in batches
+      if (!config.DEBUG_DISABLE_PRIORITY) {
+        console.log("Loading priority token pairs in batches...");
 
-      // Load pools for priority pairs first
-      for (const [symbol1, address1] of Object.entries(
-        config.PRIORITY_TOKENS_MUTABLE
-      )) {
-        if (config.DEBUG_DISABLE_PRIORITY) break;
-        for (const [symbol2, address2] of Object.entries(
+        // First collect all valid pairs
+        const priorityPairs: PriorityPair[] = [];
+        for (const [symbol1, address1] of Object.entries(
           config.PRIORITY_TOKENS_MUTABLE
         )) {
-          if (symbol1 === symbol2) continue;
-
-          const pairAddress = await config.factory.getPair(address1, address2);
-          if (pairAddress === "0x0000000000000000000000000000000000000000")
-            continue;
-
-          try {
-            await poolUtils.loadPoolData(pairAddress, -1); // Use -1 for direct lookup pools
-            console.log(`Loaded ${symbol1}-${symbol2} pool`);
-          } catch (error) {
-            console.log(`Error loading ${symbol1}-${symbol2} pool: ${error}`);
+          for (const [symbol2, address2] of Object.entries(
+            config.PRIORITY_TOKENS_MUTABLE
+          )) {
+            if (symbol1 === symbol2) continue;
+            priorityPairs.push({
+              symbol1,
+              symbol2,
+              address1,
+              address2,
+            });
           }
         }
+
+        // Process pairs in batches
+        for (
+          let i = 0;
+          i < priorityPairs.length;
+          i += config.PRIORITY_BATCH_SIZE
+        ) {
+          const pairPromises = [];
+          const batchPairs: BatchPair[] = [];
+          const end = Math.min(
+            i + config.PRIORITY_BATCH_SIZE,
+            priorityPairs.length
+          );
+
+          // First get all pair addresses in parallel
+          for (let j = i; j < end; j++) {
+            const pair = priorityPairs[j];
+            pairPromises.push(
+              config.factory
+                .getPair(pair.address1, pair.address2)
+                .then((pairAddress) => {
+                  if (
+                    pairAddress !== "0x0000000000000000000000000000000000000000"
+                  ) {
+                    batchPairs.push({
+                      ...pair,
+                      pairAddress,
+                    });
+                  }
+                  return null;
+                })
+                .catch((error) => {
+                  console.log(
+                    `Error getting pair address for ${pair.symbol1}-${pair.symbol2}: ${error}`
+                  );
+                  return null;
+                })
+            );
+          }
+
+          // Wait for all pair lookups to complete
+          await Promise.all(pairPromises);
+
+          // Then load pool data for valid pairs in parallel
+          const loadPromises = batchPairs.map((pair) => {
+            return poolUtils
+              .loadPoolData(pair.pairAddress, -1)
+              .then(() => {
+                console.log(`Loaded ${pair.symbol1}-${pair.symbol2} pool`);
+                return null;
+              })
+              .catch((error) => {
+                console.log(
+                  `Error loading ${pair.symbol1}-${pair.symbol2} pool: ${error}`
+                );
+                return null;
+              });
+          });
+
+          // Wait for all pool loads to complete
+          await Promise.all(loadPromises);
+
+          // Add a small delay between batches to avoid rate limiting
+          if (i + config.PRIORITY_BATCH_SIZE < priorityPairs.length) {
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+        }
+
+        console.log("Finished loading priority token pairs");
       }
 
+      // ---------------- RANDOM POOLS LOADING -------------------
       // Load randomly selected pools in batches
       if (!config.DEBUG_DISABLE_RANDOM_POOLS) {
         console.log(
           `Loading ${config.state.currentPoolIndices.length} randomly selected pools...`
         );
+        for (
+          let i = 0;
+          i < config.state.currentPoolIndices.length;
+          i += config.BATCH_SIZE
+        ) {
+          const batch = [];
+          const end = Math.min(
+            i + config.BATCH_SIZE,
+            config.state.currentPoolIndices.length
+          );
+
+          console.log(`Loading batch ${i} to ${end - 1}...`);
+
+          for (let j = i; j < end; j++) {
+            batch.push(
+              poolUtils.loadPoolByIndex(config.state.currentPoolIndices[j])
+            );
+          }
+
+          await Promise.all(batch);
+
+          // Short delay between batches
+          if (i + config.BATCH_SIZE < config.state.currentPoolIndices.length) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, config.BATCH_SHORT_DELAY)
+            );
+          }
+        }
       }
 
-      for (
-        let i = 0;
-        i < config.state.currentPoolIndices.length;
-        i += config.BATCH_SIZE
-      ) {
-        const batch = [];
-        const end = Math.min(
-          i + config.BATCH_SIZE,
-          config.state.currentPoolIndices.length
+      // log stable token in pairs count
+      for (const stableCoinAddress of config.STABLECOINS) {
+        const stablePools =
+          config.state.tokenPools.get(stableCoinAddress) || new Set();
+        console.log(
+          `Stable token ${config.state.tokenCache[stableCoinAddress].symbol} has ${stablePools.size} pools`
         );
 
-        console.log(`Loading batch ${i} to ${end - 1}...`);
+        // Show top pairs by liquidity if in debug mode
+        if (config.DEBUG_LEVEL > 0 && stablePools.size > 0) {
+          // Get pools with this stable token
+          const poolsWithLiquidity = Array.from(stablePools)
+            .map((poolAddress) => config.state.poolsMap.get(poolAddress))
+            .filter((pool) => pool && pool.liquidityUSD)
+            .sort((a, b) => b.liquidityUSD - a.liquidityUSD);
 
-        for (let j = i; j < end; j++) {
-          batch.push(
-            poolUtils.loadPoolByIndex(config.state.currentPoolIndices[j])
-          );
-        }
-
-        await Promise.all(batch);
-
-        // Short delay between batches
-        if (i + config.BATCH_SIZE < config.state.currentPoolIndices.length) {
-          await new Promise((resolve) =>
-            setTimeout(resolve, config.BATCH_SHORT_DELAY)
-          );
+          // Show top 3 pairs by liquidity
+          const topPairs = poolsWithLiquidity.slice(0, 3);
+          if (topPairs.length > 0) {
+            console.log(`  Top pairs by liquidity:`);
+            topPairs.forEach((pool) => {
+              const otherToken =
+                pool.token0.address.toLowerCase() ===
+                stableCoinAddress.toLowerCase()
+                  ? pool.token1.symbol
+                  : pool.token0.symbol;
+              console.log(
+                `    ${
+                  config.state.tokenCache[stableCoinAddress].symbol
+                }-${otherToken}: $${pool.liquidityUSD.toLocaleString()}`
+              );
+            });
+          }
         }
       }
 
@@ -125,7 +241,7 @@ export async function startMonitoring() {
   // Initial scan
   await loadInitialPoolData();
 
-  // Check if reset is needed
+  // -------------- CHECK IF RESET --------
   setInterval(async () => {
     if (scanPaused || config.DEBUG) return; // Skip if paused or DEBUG mode is on
     const timeSinceLastProfit = Date.now() - config.state.lastProfitFound;
@@ -141,7 +257,7 @@ export async function startMonitoring() {
     }
   }, 1000 * 60); // Check every minute
 
-  // Periodic full scans
+  // -------------- FULL SCAN -------------
   setInterval(async () => {
     if (scanPaused) return; // Skip if paused
     fullScanRunning = true;
@@ -187,37 +303,57 @@ export async function startMonitoring() {
     }
   }, config.INPUT_ARGS.full_refresh_interval ?? config.FULL_REFRESH_INTERVAL);
 
-  // More frequent targeted refreshes for priority pools
+  // -------------- PRIORITY SCAN ---------
   setInterval(async () => {
-    if (scanPaused) return; // Skip if paused
+    if (scanPaused || fullScanRunning) return;
     try {
-      if (config.DEBUG_DISABLE_PRIORITY) return; // Skip if disabled in debug mode
-      // Refresh only high priority pools
-      for (const [symbol1, address1] of Object.entries(
-        config.PRIORITY_TOKENS_MUTABLE
-      )) {
-        for (const [symbol2, address2] of Object.entries(
-          config.PRIORITY_TOKENS_MUTABLE
-        )) {
-          if (symbol1 === symbol2) continue;
+      if (config.DEBUG_DISABLE_PRIORITY) return;
 
-          const pairAddress = await config.factory.getPair(address1, address2);
-          if (pairAddress === "0x0000000000000000000000000000000000000000")
-            continue;
+      console.log("\nRefreshing priority pools...");
 
-          await poolUtils.loadPoolData(pairAddress, -1, true);
-        }
-      }
+      // Get only priority pools (those with index -1)
+      const priorityPools = Array.from(config.state.poolsMap.entries())
+        .filter(([_, pool]) => pool.index === -1)
+        .map(([address, _]) => address);
 
-      // Check for opportunities after refreshing priority pools
-      const opportunities = await arbitrageUtils.findArbitrageOpportunities();
+      console.log(`Found ${priorityPools.length} priority pools to refresh`);
 
-      if (opportunities.length > 0) {
-        displayAndSaveOpportunity(opportunities, 5); // Show up to 5 opportunities
-      } else {
-        console.log(
-          "No profitable arbitrage opportunities found in this scan. (Priority)"
+      // FORCE REFRESH ALL PRIORITY POOLS
+      // Process in batches to avoid rate limiting
+      for (
+        let i = 0;
+        i < priorityPools.length;
+        i += config.PRIORITY_BATCH_SIZE
+      ) {
+        const batch = [];
+        const end = Math.min(
+          i + config.PRIORITY_BATCH_SIZE,
+          priorityPools.length
         );
+
+        for (let j = i; j < end; j++) {
+          batch.push(poolUtils.loadPoolData(priorityPools[j], -1, true)); // force refresh
+        }
+
+        await Promise.all(batch);
+
+        // Check for opportunities after each batch refreshing
+        const opportunities = await arbitrageUtils.findArbitrageOpportunities();
+
+        if (opportunities.length > 0) {
+          displayAndSaveOpportunity(opportunities, 5);
+        } else {
+          console.log(
+            "No profitable arbitrage opportunities found in this scan. (Priority)"
+          );
+        }
+
+        // Small delay between batches if needed
+        if (i + config.PRIORITY_BATCH_SIZE < priorityPools.length) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, config.BATCH_SHORT_DELAY)
+          );
+        }
       }
     } catch (error) {
       console.error("Error during priority refresh:", error);

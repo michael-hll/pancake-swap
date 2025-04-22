@@ -1,5 +1,5 @@
 import {ethers} from "hardhat";
-import {InputsArgs} from "./types";
+import {InputsArgs, TokenInfo} from "./types";
 
 export const DEBUG = true;
 export const DEBUG_LEVEL = 1; // 0: no debug, 1: basic debug, 2: detailed debug
@@ -9,7 +9,7 @@ export const DEBUG_DISABLE_RANDOM_POOLS = false;
 export const DEBUG_DELETE_LOG_FILE = false;
 
 // Constants
-export const TEST_AMOUNTS = [1000, 10000, 100000];
+export const TEST_AMOUNTS = [1, 100, 1000, 10000];
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;
@@ -18,19 +18,23 @@ export const MAX_PROFIT_HISTORY_ITEMS = 100;
 export const BATCH_SHORT_DELAY = 1000 * 5;
 export const FULL_REFRESH_INTERVAL = 1000 * 60 * 5;
 export const PRIORITY_REFRESH_INTERVAL = 1000 * 20;
-export const RESET_INTERVAL = 1000 * 60 * 20;
+export const RESET_INTERVAL = 1000 * 60 * 15;
 
 // Random pool selection parameters
 export const POOLS_TO_SAMPLE = 100; // Number of random pools to sample
 export const RANDOM_START = 0; // Minimum pool index to consider
 export let RANDOM_END = 10000; // Maximum pool index to consider (adjustable)
-export const BATCH_SIZE = 15;
+export const BATCH_SIZE = 20;
+export const PRIORITY_BATCH_SIZE = 5;
 
 // Profit thresholds
 export const MIN_PROFIT_THRESHOLD = 0.01;
 export const MIN_LIQUIDITY_USD = 50000;
 
 export const INPUT_ARGS: InputsArgs = {};
+
+export const UNKNOW_TOKEN_SYMBOL = "UNKNOW_SYMBOL";
+export const UNKNOW_TOKEN_NAME = "UNKNOW_NAME";
 
 // ABIs
 export const FACTORY_ABI = [
@@ -54,7 +58,7 @@ export const ERC20_ABI = [
 
 // Priority tokens to focus on
 export const PRIORITY_TOKENS_MUTABLE = {
-  WBNB: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c",
+  WBNB: "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c", // we can't use WBNB as a token in the pool, since we need to borrow amount from it
   BUSD: "0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56",
   USDT: "0x55d398326f99059fF775485246999027B3197955",
   CAKE: "0x0E09FaBB73Bd3Ade0a17ECC321fD13a19e81cE82",
@@ -79,8 +83,8 @@ export const PRIORITY_TOKENS_MUTABLE = {
 export const STABLECOINS = [
   PRIORITY_TOKENS_MUTABLE.BUSD.toLowerCase(),
   PRIORITY_TOKENS_MUTABLE.USDT.toLowerCase(),
-  "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d", // USDC
-  "0x1AF3F329e8BE154074D8769D1FFa4eE058B1DBc3", // DAI
+  PRIORITY_TOKENS_MUTABLE.USDC.toLocaleLowerCase(),
+  PRIORITY_TOKENS_MUTABLE.DAI.toLowerCase(),
 ];
 
 // Provider setup
@@ -99,7 +103,7 @@ export const state = {
 
   // Token info cache
   tokenCache: {} as {
-    [address: string]: {name: string; symbol: string; decimals: number};
+    [address: string]: TokenInfo;
   },
 
   // In-memory pool data storage
