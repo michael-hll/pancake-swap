@@ -244,7 +244,7 @@ export async function findArbitrageOpportunities() {
               opportunity.profitPercent >
                 (config.INPUT_ARGS.percent ?? config.MIN_PROFIT_THRESHOLD)
             ) {
-              sendArbitrage(opportunity);
+              validateOpportunityAndSend(opportunity);
               opportunities.push(opportunity);
               // Update last profit found time
               config.state.lastProfitFound = Date.now();
@@ -608,4 +608,39 @@ Test results: ${JSON.stringify(testResults, null, 2)}\n
     console.log(`Error calculating arbitrage: ${error}`);
     return null;
   }
+}
+
+function validateOpportunityAndSend(opportunity: ArbitrageOpportunity): void {
+  // Validate the opportunity object
+  if (
+    !opportunity ||
+    !opportunity.startToken ||
+    !opportunity.bestAmount ||
+    !opportunity.path ||
+    !opportunity.expectedProfit ||
+    !opportunity.profitPercent ||
+    !opportunity.netProfit ||
+    !opportunity.testAmounts ||
+    !opportunity.testResults ||
+    opportunity.bestAmount < 100
+  ) {
+    console.error("Invalid opportunity object:", opportunity);
+    return;
+  }
+
+  // The token path can't include the chain base token
+  const isBaseTokenInPath = opportunity.path.some(
+    (step) =>
+      step.tokenIn === config.PRIORITY_TOKENS_MUTABLE.WBNB ||
+      step.tokenOut === config.PRIORITY_TOKENS_MUTABLE.WBNB
+  );
+  if (isBaseTokenInPath) {
+    console.error(
+      "Opportunity path contains the base token (WBNB), skipping..."
+    );
+    return;
+  }
+
+  // Send the opportunity to the queue
+  sendArbitrage(opportunity);
 }

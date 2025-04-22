@@ -67,3 +67,12 @@ export interface TestResult {
   skippedOnChain?: boolean; // Whether on-chain verification was skipped
   error?: string; // Optional error information
 }
+
+export interface StartArbitrageArgs {
+  token0: string;
+  borrowAmount: bigint | string;
+  token1: string;
+  token2: string;
+  deadLineMin: number;
+  slippages: number[];
+}
