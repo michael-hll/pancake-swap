@@ -123,46 +123,70 @@ export async function findArbitrageOpportunities() {
   // We'll store found opportunities here
   const opportunities: ArbitrageOpportunity[] = [];
 
-  // Focus on stablecoins as entry points
-  for (const stablecoin of config.STABLECOINS) {
-    // Get all pools with this stablecoin
-    const stablePools = config.state.tokenPools.get(stablecoin) || new Set();
+  // Use all priority tokens as entry points instead of just stablecoins
+  const priorityTokenAddresses = Object.values(
+    config.PRIORITY_TOKENS_MUTABLE
+  ).map((address) => address.toLowerCase());
 
-    if (stablePools.size === 0) continue;
+  console.log(
+    `Searching for arbitrage with ${priorityTokenAddresses.length} priority tokens as entry points`
+  );
 
-    // For each pool with the stablecoin
-    for (const stablePoolAddr of stablePools) {
-      const stablePool = config.state.poolsMap.get(stablePoolAddr);
-      if (!stablePool) continue;
+  // Loop through all priority tokens
+  for (const startToken of priorityTokenAddresses) {
+    // Get all pools with this token
+    const startTokenPools =
+      config.state.tokenPools.get(startToken) || new Set();
+
+    if (startTokenPools.size === 0) {
+      console.log(
+        `No pools found for ${
+          config.state.tokenCache[startToken]?.symbol || startToken
+        }`
+      );
+      continue;
+    }
+
+    debugLog(
+      `Checking ${startTokenPools.size} pools for ${
+        config.state.tokenCache[startToken]?.symbol || startToken
+      }`,
+      2
+    );
+
+    // For each pool with the start token
+    for (const startPoolAddr of startTokenPools) {
+      const startPool = config.state.poolsMap.get(startPoolAddr);
+      if (!startPool) continue;
 
       // Skip low liquidity pools
       if (
-        stablePool.liquidityUSD !== "Unknown" &&
-        Number(stablePool.liquidityUSD) < config.MIN_LIQUIDITY_USD
+        startPool.liquidityUSD !== config.UNKNOW_LIQUIDITY_USD &&
+        Number(startPool.liquidityUSD) < config.MIN_LIQUIDITY_USD
       ) {
         continue;
       }
 
       // Get the other token in the pool
       const midToken =
-        stablePool.token0.address === stablecoin
-          ? stablePool.token1.address
-          : stablePool.token0.address;
+        startPool.token0.address.toLowerCase() === startToken.toLowerCase()
+          ? startPool.token1.address.toLowerCase()
+          : startPool.token0.address.toLowerCase();
 
       // Get all pools with this middle token
       const midTokenPools = config.state.tokenPools.get(midToken) || new Set();
 
       // For each pool with the middle token
       for (const midPoolAddr of midTokenPools) {
-        // Skip the original stablecoin pool
-        if (midPoolAddr === stablePoolAddr) continue;
+        // Skip the original start token pool
+        if (midPoolAddr === startPoolAddr) continue;
 
         const midPool = config.state.poolsMap.get(midPoolAddr);
         if (!midPool) continue;
 
         // Skip low liquidity pools
         if (
-          midPool.liquidityUSD !== "Unknown" &&
+          midPool.liquidityUSD !== config.UNKNOW_LIQUIDITY_USD &&
           Number(midPool.liquidityUSD) < config.MIN_LIQUIDITY_USD
         ) {
           continue;
@@ -170,19 +194,19 @@ export async function findArbitrageOpportunities() {
 
         // Get the other token in the middle pool
         const destToken =
-          midPool.token0.address === midToken
-            ? midPool.token1.address
-            : midPool.token0.address;
+          midPool.token0.address.toLowerCase() === midToken.toLowerCase()
+            ? midPool.token1.address.toLowerCase()
+            : midPool.token0.address.toLowerCase();
 
-        // Skip if it's the original stablecoin
-        if (destToken === stablecoin) continue;
+        // Skip if it's the original start token
+        if (destToken === startToken) continue;
 
-        // Check if there's a pool between dest token and stablecoin
+        // Check if there's a pool between dest token and start token
         const destPools = config.state.tokenPools.get(destToken) || new Set();
 
         for (const destPoolAddr of destPools) {
           // Skip already used pools
-          if (destPoolAddr === stablePoolAddr || destPoolAddr === midPoolAddr)
+          if (destPoolAddr === startPoolAddr || destPoolAddr === midPoolAddr)
             continue;
 
           const destPool = config.state.poolsMap.get(destPoolAddr);
@@ -190,26 +214,26 @@ export async function findArbitrageOpportunities() {
 
           // Skip low liquidity pools
           if (
-            destPool.liquidityUSD !== "Unknown" &&
+            destPool.liquidityUSD !== config.UNKNOW_LIQUIDITY_USD &&
             Number(destPool.liquidityUSD) < config.MIN_LIQUIDITY_USD
           ) {
             continue;
           }
 
-          // Check if this pool connects back to the stablecoin
+          // Check if this pool connects back to the start token
           const otherToken =
-            destPool.token0.address === destToken
-              ? destPool.token1.address
-              : destPool.token0.address;
+            destPool.token0.address.toLowerCase() === destToken.toLowerCase()
+              ? destPool.token1.address.toLowerCase()
+              : destPool.token0.address.toLowerCase();
 
-          if (otherToken === stablecoin) {
+          if (otherToken === startToken) {
             // We found a triangular path!
             // Calculate potential profit
             const profit = await calculateTriangularArbitrage(
-              stablecoin,
+              startToken,
               midToken,
               destToken,
-              stablePool,
+              startPool,
               midPool,
               destPool
             );

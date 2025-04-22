@@ -180,7 +180,7 @@ export async function loadPoolData(
     const token1Price = Number(reserve0) / Number(reserve1);
 
     // Calculate liquidity
-    let liquidityUSD = "Unknown";
+    let liquidityUSD = config.UNKNOW_LIQUIDITY_USD;
     const token0Lower = token0.toLowerCase();
     const token1Lower = token1.toLowerCase();
 

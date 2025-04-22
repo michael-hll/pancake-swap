@@ -36,6 +36,7 @@ export const INPUT_ARGS: InputsArgs = {};
 
 export const UNKNOW_TOKEN_SYMBOL = "UNKNOW_SYMBOL";
 export const UNKNOW_TOKEN_NAME = "UNKNOW_NAME";
+export const UNKNOW_LIQUIDITY_USD = "UNKNOW_LIQUIDITY_USD";
 
 // ABIs
 export const FACTORY_ABI = [
