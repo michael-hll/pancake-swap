@@ -358,30 +358,24 @@ export async function calculateTriangularArbitrage(
           findPoolForPair,
           isToken0
         );
-        if (localEstimate > amount) {
-          debugLog(
-            `Test Amount (+): ${amount}, localEstimate: ${localEstimate}, tradePath: ${tradePath
-              .map((token) => config.state.tokenCache[token].symbol)
-              .join(" -> ")}`
-          );
-        } else {
-          debugLog(
-            `Test Amount (-): ${amount}, localEstimate: ${localEstimate}, tradePath: ${tradePath
-              .map((token) => config.state.tokenCache[token].symbol)
-              .join(" -> ")}`,
-            2
-          );
-        }
+
         const flashLoanFee = amount * 0.003;
         const amountToRepay = amount + flashLoanFee;
         const estimatedProfit = localEstimate - amountToRepay;
         const estimatedProfitPercent = estimatedProfit / amount;
 
-        if (estimatedProfitPercent > 0) {
+        if (localEstimate > amount) {
           debugLog(
-            `Amount: ${amount}, Local estimate: ${localEstimate},tradePath: ${tradePath}, reserves: ${JSON.stringify(
-              reserves
-            )}`
+            `Test Amount (+): ${amount}, localEstimate: ${localEstimate}, estimatedProfitPercent: ${estimatedProfitPercent}, tradePath: ${tradePath
+              .map((token) => config.state.tokenCache[token].symbol)
+              .join(" -> ")}`
+          );
+        } else {
+          debugLog(
+            `Test Amount (+): ${amount}, localEstimate: ${localEstimate}, estimatedProfitPercent: ${estimatedProfitPercent}, tradePath: ${tradePath
+              .map((token) => config.state.tokenCache[token].symbol)
+              .join(" -> ")}`,
+            2
           );
         }
 
