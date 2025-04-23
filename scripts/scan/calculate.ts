@@ -622,7 +622,7 @@ function validateOpportunityAndSend(opportunity: ArbitrageOpportunity): void {
     !opportunity.netProfit ||
     !opportunity.testAmounts ||
     !opportunity.testResults ||
-    opportunity.bestAmount < 100
+    opportunity.bestAmount < config.TX_MIN_BEST_AMOUNT
   ) {
     console.error("Invalid opportunity object:", opportunity);
     return;

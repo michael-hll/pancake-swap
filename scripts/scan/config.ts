@@ -11,6 +11,7 @@ export const DEBUG_DELETE_LOG_FILE = false;
 
 // Constants
 export const TEST_AMOUNTS = [1, 100, 1000, 10000];
+export const TX_MIN_BEST_AMOUNT = 250;
 export const PANCAKE_FACTORY = "0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73";
 export const GAS_PRICE = 6; // Gwei
 export const MAX_PROFIT_HISTORY_ITEMS = 100;

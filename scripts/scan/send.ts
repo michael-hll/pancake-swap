@@ -17,14 +17,18 @@ const JOB_NAME = "flash"; // Job name for BullMQ queue
  */
 export async function sendArbitrage(
   opportunityData: ArbitrageOpportunity,
-  testing = false
+  isTesting = false
 ): Promise<string | undefined> {
   try {
+    if (isTesting && JOB_NAME === "flash") {
+      throw new Error("Testing mode is not allowed for flash jobs");
+    }
     // Validate opportunity data
     if (
       !opportunityData ||
       !opportunityData.startToken ||
-      !opportunityData.bestAmount
+      !opportunityData.bestAmount ||
+      opportunityData.bestAmount <= config.TX_MIN_BEST_AMOUNT
     ) {
       throw new Error("Invalid opportunity data");
     }
@@ -103,7 +107,7 @@ export async function sendArbitrage(
       opportunityData.path,
       opportunityData.testResults,
       borrowTokenDecimals,
-      testing
+      isTesting
     );
     return job.id || "";
   } catch (error: unknown) {
@@ -116,56 +120,63 @@ async function sendAnotherArbitrage(
   path: ArbitragePathStep[],
   testResults: TestResult[],
   borrowTokenDecimals: number = 18,
-  testing = false
+  isTesting = false
 ) {
-  let isContinue = true;
-  testResults.sort((a, b) => a.amount - b.amount); // sort by amount ascending
-  for (let i = 1; i < testResults.length; i++) {
-    if (testResults[i].profitPercent < testResults[i - 1].profitPercent) {
-      isContinue = false;
-      break;
+  try {
+    if (isTesting && JOB_NAME === "flash") {
+      throw new Error("Testing mode is not allowed for flash jobs");
     }
-  }
-  if (isContinue && testResults.length >= 3) {
-    console.log("\n🚀 Scaling opportunity found - submitting larger trade!");
-    debugLog("Profit increases with amount - scaling up!", 1);
-    // Get pool liquidities from your pool data
-    const poolLiquidities = path.map((step) => {
-      const pool = config.state.poolsMap.get(step.poolAddress);
-      return pool
-        ? Number(
-            pool.liquidityUSD === config.UNKNOW_LIQUIDITY_USD
-              ? "0"
-              : pool.liquidityUSD
-          )
-        : 0;
-    });
+    if (testResults.length < 3) return;
+    let isContinue = true;
+    testResults.sort((a, b) => a.amount - b.amount);
+    for (let i = 1; i < testResults.length; i++) {
+      if (testResults[i].profitPercent < testResults[i - 1].profitPercent) {
+        isContinue = false;
+        break;
+      }
+    }
+    if (isContinue) {
+      console.log("\n🚀 Scaling opportunity found - submitting larger trade!");
+      debugLog("Scaling opportunity found - submitting larger trade!", 1);
+      const poolLiquidities = path.map((step) => {
+        const pool = config.state.poolsMap.get(step.poolAddress);
+        return pool
+          ? Number(
+              pool.liquidityUSD === config.UNKNOW_LIQUIDITY_USD
+                ? "0"
+                : pool.liquidityUSD
+            )
+          : 0;
+      });
 
-    // Calculate safe amount
-    const borrowAmountStr = testing
-      ? ethers.parseUnits("0.01", borrowTokenDecimals).toString()
-      : calculateSafeTradeAmount(poolLiquidities, borrowTokenDecimals);
+      // Calculate safe amount
+      const borrowAmountStr = isTesting
+        ? ethers.parseUnits("0.01", borrowTokenDecimals).toString()
+        : calculateSafeTradeAmount(poolLiquidities, borrowTokenDecimals);
 
-    // Set more conservative slippage for larger amounts
-    jobPayload.borrowAmount = borrowAmountStr;
-    jobPayload.slippages = [990, 990, 990]; // 1% slippage
+      // Set more conservative slippage for larger amounts
+      jobPayload.borrowAmount = borrowAmountStr;
+      jobPayload.slippages = isTesting ? [997, 997, 997] : [990, 990, 990]; // 1% slippage
 
-    // Queue the job
-    const job = await config.arbitrageQueue.add(JOB_NAME, jobPayload, {
-      priority: Math.ceil(-100 * 10000),
-      attempts: 1,
-    });
+      // Queue the job
+      const job = await config.arbitrageQueue.add(JOB_NAME, jobPayload, {
+        priority: Math.ceil(-100 * 10000),
+        attempts: 1,
+      });
 
-    console.log(
-      `Large arbitrage job queued with ID: ${
-        job.id
-      }, amount: ${ethers.formatUnits(borrowAmountStr, borrowTokenDecimals)}`
-    );
-  } else {
-    debugLog(
-      `Not scaling: isContinue=${isContinue}, testResults.length=${testResults.length}`,
-      2
-    );
+      console.log(
+        `Large arbitrage job queued with ID: ${
+          job.id
+        }, amount: ${ethers.formatUnits(borrowAmountStr, borrowTokenDecimals)}`
+      );
+    } else {
+      debugLog(
+        `Not scaling: isContinue=${isContinue}, testResults.length=${testResults.length}`,
+        2
+      );
+    }
+  } catch (error) {
+    console.error(`Failed to queue arbitrage job:`, error);
   }
 }
 
