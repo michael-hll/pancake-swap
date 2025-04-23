@@ -9,7 +9,8 @@
     "start:mainnet": "npx hardhat run scripts/start-arbitrage.ts --network mainnet",
     "start-simulation:testnet": "npx hardhat run scripts/start-simulation.ts --network testnet",
     "start-simulation:mainnet": "npx hardhat run scripts/start-simulation.ts --network mainnet",
-    "send:test": "npx hardhat run scripts/scan/send.ts"
+    "send:test": "npx hardhat run scripts/scan/send.ts",
+    "scan": "npx hardhat run scripts/scan/main.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
