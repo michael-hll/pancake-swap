@@ -2,6 +2,10 @@
 
 This project implements a flash loan arbitrage system for PancakeSwap V2 on Binance Smart Chain (BSC). It consists of a smart contract for executing triangle arbitrage opportunities and a scanning system to detect profitable trading paths.
 
+In order to send real arbitrage opportunities to the flash-queue system, you need this project also:
+<https://github.com/michael-hll/flash-queue>
+So in general, the pancake-swap scan opportunities and send the opportunity to the flash-queue system.
+
 ## Project Structure
 
 - contracts: Smart contracts for flash loan arbitrage execution
