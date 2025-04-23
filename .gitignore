@@ -31,3 +31,4 @@ artifacts
 private-key.yaml
 
 data
+test.ts

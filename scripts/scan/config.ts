@@ -19,7 +19,7 @@ export const MAX_PROFIT_HISTORY_ITEMS = 100;
 // Timing parameters (ms)
 export const BATCH_SHORT_DELAY = 1000 * 10;
 export const FULL_REFRESH_INTERVAL = 1000 * 60 * 5;
-export const PRIORITY_REFRESH_INTERVAL = 1000 * 20;
+export const PRIORITY_REFRESH_INTERVAL = 1000 * 30;
 export const RESET_INTERVAL = 1000 * 60 * 15;
 
 // Random pool selection parameters
