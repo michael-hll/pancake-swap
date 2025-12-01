@@ -284,11 +284,12 @@ contract FlashSwap is ReentrancyGuard {
         bytes memory data = abi.encode(TOKEN0, _borrow_amt, msg.sender);
 
         // Execute the initial swap to get the loan
+        // Borrow TOKEN0 amount and store it in the FlashSwap contract
         IUniswapV2Pair(pair).swap(amount0Out, amount1Out, address(this), data);
     }
 
     function pancakeCall(
-        address _sender,
+        address _sender, // should be this contract address
         uint256 _amount0,
         uint256 _amount1,
         bytes calldata _data
@@ -307,7 +308,7 @@ contract FlashSwap is ReentrancyGuard {
         (
             address tokenBorrow,
             uint256 borrowAmount,
-            address myAccountAddress
+            address myAccountAddress // who started the flash loan
         ) = abi.decode(_data, (address, uint256, address));
         if (debugMode) {
             emit DebugFlashLoanReceived(tokenBorrow, borrowAmount);
@@ -318,7 +319,7 @@ contract FlashSwap is ReentrancyGuard {
         uint256 amountToRepay = borrowAmount + fee;
 
         // DO TRIANGLE ARBITRAGE
-        // Assign loan amount
+        // Assign loan amount (TOKEN0)
         uint256 loanAmount = _amount0 > 0 ? _amount0 : _amount1;
         // Verify loan amount matches the expected amount
         require(loanAmount == borrowAmount, "loan amount mismatch");

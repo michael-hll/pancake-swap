@@ -233,7 +233,8 @@ async function checkAndDisplayContractBalance(
   }
 }
 
-// Main simulation function
+/* simulateArbitrage is an off‑chain estimator that checks whether a 3‑step triangle arbitrage using a 
+flash‑loan from a given pair would be possible and profitable without sending any transactions.*/
 async function simulateArbitrage(
   token0: string,
   amount: bigint,

@@ -5,12 +5,13 @@
     "flat": "npx hardhat flatten contracts/FlashSwap.sol > FlashSwapFlat.sol",
     "deploy:mainnet": "npx hardhat run scripts/deploy.ts --network mainnet",
     "deploy:testnet": "npx hardhat run scripts/deploy.ts --network testnet",
+    "check-existing-main": "npx hardhat run scripts/check-existing-contract.ts --network mainnet",
     "start:testnet": "npx hardhat run scripts/start-arbitrage.ts --network testnet",
     "start:mainnet": "npx hardhat run scripts/start-arbitrage.ts --network mainnet",
     "start-simulation:testnet": "npx hardhat run scripts/start-simulation.ts --network testnet",
     "start-simulation:mainnet": "npx hardhat run scripts/start-simulation.ts --network mainnet",
     "send:test": "npx hardhat run scripts/scan/send.ts",
-    "scan": "npx hardhat run scripts/scan/main.ts"
+    "scan": "npx hardhat run scripts/scan/main.ts --network mainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
