@@ -84,12 +84,33 @@ export const PRIORITY_TOKENS_MUTABLE = {
 };
 
 // Stablecoins for liquidity calculation
+// BSC Stablecoins (lowercase addresses)
 export const STABLECOINS = [
-  PRIORITY_TOKENS_MUTABLE.BUSD.toLowerCase(),
-  PRIORITY_TOKENS_MUTABLE.USDT.toLowerCase(),
-  PRIORITY_TOKENS_MUTABLE.USDC.toLocaleLowerCase(),
-  PRIORITY_TOKENS_MUTABLE.DAI.toLowerCase(),
+  // Major USD stables
+  "0xe9e7cea3dedca5984780bafc599bd69add087d56", // BUSD (Binance USD)
+  "0x55d398326f99059ff775485246999027b3197955", // USDT (Tether USD - BSC)
+  "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d", // USDC (USD Coin - BSC)
+  "0x1af3f329e8be154074d8769d1ffa4ee058b1dbc3", // DAI (Dai Stablecoin)
+  
+  // Other USD stables
+  "0x14016e85a25aeb13065688cafb43044c2ef86784", // TUSD (TrueUSD)
+  "0xb3c11196a4f3b1da7c23d9fb0a3dde9c6340934f", // USDP (Pax Dollar)
+  "0xc5f0f7b66764f6ec8c8dff7ba683102295e16409", // FDUSD (First Digital USD)
+  "0x23396cf899ca06c4472205fc903bdb4de249d6fc", // UST (TerraUSD - deprecated but may exist)
+  "0x0782b6d8c4551b9760e74c0545a9bcd90bdc41e5", // HAY (Helio USD)
+  "0xf2511b5e4fb0e5e2d123004b672ba14850478c14", // DOLA (Dola USD)
+  
+  // Algorithmic / other stables
+  "0x3f56e0c36d275367b8c502090edf38289b3dea0d", // MAI (miMATIC)
+  "0xa7d7079b0fead91f3e65f86e8915cb59c1a4c664", // USDC.e (bridged)
+  "0xd17479997f34dd9156deef8f95a52d81d265be9c", // USDD (Decentralized USD)
+  
+  // Wrapped/bridged
+  "0x4fabb145d64652a948d72533023f6e7a623c7c53", // BUSD (Ethereum bridged)
+  
+  // Add more as needed...
 ];
+export const STABLECOIN_SET = new Set(STABLECOINS);
 
 // Provider setup
 export const provider = ethers.provider;

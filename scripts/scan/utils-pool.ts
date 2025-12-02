@@ -184,10 +184,17 @@ export async function loadPoolData(
     const token0Lower = token0.toLowerCase();
     const token1Lower = token1.toLowerCase();
 
-    if (config.STABLECOINS.includes(token0Lower)) {
-      liquidityUSD = (Number(reserve0) * 2).toString();
-    } else if (config.STABLECOINS.includes(token1Lower)) {
-      liquidityUSD = (Number(reserve1) * 2).toString();
+    const r0 = Number(reserve0);
+    const r1 = Number(reserve1);
+    if (config.STABLECOIN_SET.has(token0Lower) && config.STABLECOIN_SET.has(token1Lower)) {
+      // both stable: sum them (already in USD)
+      liquidityUSD = (r0 + r1).toString();
+    } else if (config.STABLECOIN_SET.has(token0Lower)) {
+      liquidityUSD = (r0 * 2).toString();
+    } else if (config.STABLECOIN_SET.has(token1Lower)) {
+      liquidityUSD = (r1 * 2).toString();
+    } else {
+      liquidityUSD = config.UNKNOW_LIQUIDITY_USD;
     }
 
     // Create pool data
@@ -212,10 +219,16 @@ export async function loadPoolData(
         [`${token0Info.symbol}_PER_${token1Info.symbol}`]: token1Price,
         [`${token1Info.symbol}_PER_${token0Info.symbol}`]: token0Price,
       },
-      liquidityUSD,
-      totalSupply: ethers.formatEther(totalSupply),
+      liquidityUSD, // Estimated total liquidity in USD
+      totalSupply: ethers.formatEther(totalSupply), // total LP tokens (total liquidity pool contract tokens)
       updated: new Date().toISOString(),
     };
+    // LP tokens 
+    /*📈 What is totalSupply for LP-tokens — and when it changes
+	•	totalSupply is the total number of LP tokens currently outstanding for that pool — i.e. all LP tokens minted minus those burned.  ￼
+	•	Initially, when the pool is first created and someone supplies the first liquidity, totalSupply = 0. Then the first liquidity provider deposits token0 + token1; the contract mints a certain amount of LP tokens (minus a small “MINIMUM_LIQUIDITY” reserved amount) and sends them to the provider.  ￼
+	•	On subsequent liquidity additions (by same or different providers), totalSupply increases: new LP tokens are minted in proportion to the amount of liquidity added (relative to existing reserves).  ￼
+	•	On liquidity removal (“burn”), LP tokens are burned, and totalSupply decreases accordingly.  */
 
     // Save to memory
     config.state.poolsMap.set(pairAddress, poolData);
